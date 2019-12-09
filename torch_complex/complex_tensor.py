@@ -7,8 +7,6 @@ import re
 
 
 class ComplexTensor(torch.Tensor):
-
-
     @staticmethod
     def __new__(cls, x):
         # required pytorch tensor shape (...,2)
@@ -92,7 +90,7 @@ class ComplexTensor(torch.Tensor):
 
     def abs(self):
         return self.norm(dim=-1)
-    
+
     def add(self,m):
         if isinstance(c,ComplexTensor):
             result = self+m

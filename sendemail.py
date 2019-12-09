@@ -35,6 +35,6 @@ def send_message(text,successQ):
             sender,receivers,message.as_string())
         #退出
         smtpObj.quit()
-        print('success')
+        print('sand a {} message'.format("success" if successQ else "fail"))
     except smtplib.SMTPException as e:
         print('error',e) #打印错误

@@ -2,7 +2,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-from . import complex_layer as nc
 
 __all__ = ['SqueezeNet', 'squeezenet1_0', 'squeezenet1_1']
 
@@ -13,14 +12,12 @@ class Fire(nn.Module):
                  expand1x1_planes, expand3x3_planes):
         super(Fire, self).__init__()
         self.inplanes = inplanes
-        self.squeeze = nc.Conv1d(inplanes, squeeze_planes, kernel_size=1)
-        self.squeeze_activation = nc.ReLU(inplace=True)
-        self.expand1x1 = nc.Conv1d(squeeze_planes, expand1x1_planes,
-                                   kernel_size=1)
-        self.expand1x1_activation = nc.ReLU(inplace=True)
-        self.expand3x3 = nc.Conv1d(squeeze_planes, expand3x3_planes,
-                                   kernel_size=3, padding=1)
-        self.expand3x3_activation = nc.ReLU(inplace=True)
+        self.squeeze = nn.Conv1d(inplanes, squeeze_planes, kernel_size=1)
+        self.squeeze_activation = nn.ReLU(inplace=True)
+        self.expand1x1 = nn.Conv1d(squeeze_planes, expand1x1_planes,kernel_size=1)
+        self.expand1x1_activation = nn.ReLU(inplace=True)
+        self.expand3x3 = nn.Conv1d(squeeze_planes, expand3x3_planes,kernel_size=3, padding=1)
+        self.expand3x3_activation = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.squeeze_activation(self.squeeze(x))
@@ -40,51 +37,51 @@ class SqueezeNet(nn.Module):
         #self.num_classes = num_classes
         if version == 1.0:
             self.features = nn.Sequential(
-                nc.Conv1d(3, 96, kernel_size=7, stride=2),
-                nc.ReLU(inplace=True),
-                nc.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
+                nn.Conv1d(3, 96, kernel_size=7, stride=2),
+                nn.ReLU(inplace=True),
+                nn.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
                 Fire(96, 16, 64, 64),
                 Fire(128, 16, 64, 64),
                 Fire(128, 32, 128, 128),
-                nc.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
+                nn.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
                 Fire(256, 32, 128, 128),
                 Fire(256, 48, 192, 192),
                 Fire(384, 48, 192, 192),
                 Fire(384, 64, 256, 256),
-                nc.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
+                nn.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
                 Fire(512, 64, 256, 256),
             )
         else:
             self.features = nn.Sequential(
-                nc.Conv1d(3, 64, kernel_size=3, stride=2),
-                nc.ReLU(inplace=True),
-                nc.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
+                nn.Conv1d(3, 64, kernel_size=3, stride=2),
+                nn.ReLU(inplace=True),
+                nn.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
                 Fire(64, 16, 64, 64),
                 Fire(128, 16, 64, 64),
-                nc.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
+                nn.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
                 Fire(128, 32, 128, 128),
                 Fire(256, 32, 128, 128),
-                nc.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
+                nn.AvgPool1d(kernel_size=3, stride=2, ceil_mode=True),
                 Fire(256, 48, 192, 192),
                 Fire(384, 48, 192, 192),
                 Fire(384, 64, 256, 256),
                 Fire(512, 64, 256, 256),
             )
         # Final convolution is initialized differently form the rest
-        #final_conv = nc.Conv1d(512, self.num_classes, kernel_size=1)
-        self.classifier = nc.Linear(in_features=1024, out_features=80)
-        self.final_pool= nc.AvgPool1d(kernel_size=3,stride=2)
+        #final_conv = nn.Conv1d(512, self.num_classes, kernel_size=1)
+        self.classifier = nn.Linear(in_features=1024, out_features=80)
+        self.final_pool = nn.AvgPool1d(kernel_size=3,stride=2)
         for m in self.modules():
-            if isinstance(m, nc.Conv1d):
+            if isinstance(m, nn.Conv1d):
                 init.kaiming_uniform_(m.weight.data)
                 if m.bias is not None:
                     m.bias.data.zero_()
 
     def forward(self, x):
-        x = x.reshape(x.size(0),x.size(1),-1,2)
+        x = x.reshape(x.size(0),x.size(1),-1)
         x = self.features(x)
         x = self.final_pool(x)
-        x = x.reshape(x.size(0),-1,2)
+        x = x.reshape(x.size(0),-1)
         x = self.classifier(x)
         return x
 

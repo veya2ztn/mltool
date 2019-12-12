@@ -1,5 +1,4 @@
 import torch.nn as nn
-from . import complex_layer as nc
 import math
 import torch.utils.model_zoo as model_zoo
 
@@ -10,7 +9,7 @@ __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101','resnet152'
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
-    return nc.Conv1d(in_planes, out_planes, kernel_size=3, stride=stride,
+    return nn.Conv1d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
 
 
@@ -20,10 +19,10 @@ class BasicBlock(nn.Module):
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes, stride)
-        self.bn1 = nc.BatchNorm1d(planes)
-        self.relu = nc.ReLU(inplace=True)
+        self.bn1 = nn.BatchNorm1d(planes)
+        self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
-        self.bn2 = nc.BatchNorm1d(planes)
+        self.bn2 = nn.BatchNorm1d(planes)
         self.downsample = downsample
         self.stride = stride
 
@@ -51,14 +50,14 @@ class Bottleneck(nn.Module):
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(Bottleneck, self).__init__()
-        self.conv1 = nc.Conv1d(inplanes, planes, kernel_size=1, bias=False)
-        self.bn1   = nc.BatchNorm1d(planes)
-        self.conv2 = nc.Conv1d(planes, planes, kernel_size=3, stride=stride,
+        self.conv1 = nn.Conv1d(inplanes, planes, kernel_size=1, bias=False)
+        self.bn1   = nn.BatchNorm1d(planes)
+        self.conv2 = nn.Conv1d(planes, planes, kernel_size=3, stride=stride,
                                padding=1, bias=False)
-        self.bn2   = nc.BatchNorm1d(planes)
-        self.conv3 = nc.Conv1d(planes, planes * 4, kernel_size=1, bias=False)
-        self.bn3   = nc.BatchNorm1d(planes * 4)
-        self.relu  = nc.ReLU(inplace=True)
+        self.bn2   = nn.BatchNorm1d(planes)
+        self.conv3 = nn.Conv1d(planes, planes * 4, kernel_size=1, bias=False)
+        self.bn3   = nn.BatchNorm1d(planes * 4)
+        self.relu  = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
 
@@ -90,42 +89,34 @@ class ResNet(nn.Module):
     def __init__(self, block, layers, num_classes=1000):
         self.inplanes = 64
         super(ResNet, self).__init__()
-        self.conv1   = nc.Conv1d(3, 64, kernel_size=7, stride=2, padding=3,
+        self.conv1   = nn.Conv1d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
-        self.bn1     = nc.BatchNorm1d(64)
-        self.relu    = nc.ReLU(inplace=True)
-        self.maxpool = nc.AvgPool1d(kernel_size=3, stride=2)
+        self.bn1     = nn.BatchNorm1d(64)
+        self.relu    = nn.ReLU(inplace=True)
+        self.maxpool = nn.AvgPool1d(kernel_size=3, stride=2)
         #self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
         self.layer1  = self._make_layer(block, 64, layers[0])
         self.layer2  = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3  = self._make_layer(block, 256, layers[2], stride=4)
         self.layer4  = self._make_layer(block, 512, layers[3], stride=4)
-        self.avgpool = nc.AvgPool1d(7, stride=1)
-        self.fc = nc.Linear(512 * block.expansion, num_classes)
+        self.avgpool = nn.AvgPool1d(7, stride=1)
+        self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
-            if isinstance(m, nc.ComplexConv1d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+            if isinstance(m, nn.Conv1d):
+                n = m.kernel_size[0] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
             elif isinstance(m, nn.BatchNorm1d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
-            elif isinstance(m, nc.ComplexBatchNorm1d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
-            elif isinstance(m, nc.ComplexReImNorm1d):
-                m.r_norm.weight.data.fill_(1)
-                m.r_norm.bias.data.zero_()
-                m.i_norm.weight.data.fill_(1)
-                m.i_norm.bias.data.zero_()
 
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nc.Conv1d(self.inplanes, planes * block.expansion,
+                nn.Conv1d(self.inplanes, planes * block.expansion,
                           kernel_size=1, stride=stride, bias=False),
-                nc.BatchNorm1d(planes * block.expansion),
+                nn.BatchNorm1d(planes * block.expansion),
             )
 
         layers = []
@@ -137,7 +128,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = x.reshape(x.size(0),x.size(1),-1,2)
+        x = x.reshape(x.size(0),x.size(1),-1)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -149,7 +140,7 @@ class ResNet(nn.Module):
         x = self.layer4(x)
 
         x = self.avgpool(x)
-        x = x.view(x.size(0), -1,2)
+        x = x.view(x.size(0), -1)
         x = self.fc(x)
 
         return x

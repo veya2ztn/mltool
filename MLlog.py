@@ -212,9 +212,9 @@ class RecordLoss:
         if file_name is None:file_name = self.mode+'.loss.log'
         file_name = os.path.join(path,file_name)
         if self.step_now%self.save_txt_step !=0: return
-        if self.step_now == 0:
-            with open(file_name,'w') as log_file:
-                log_file.write('')
+        # if self.step_now == 0:
+        #     with open(file_name,'w') as log_file:
+        #         log_file.write('')
         self.print2file(self.step_now,file_name)
 
     def auto_save_model(self,model,path,filename=None):

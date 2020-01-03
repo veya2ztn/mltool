@@ -123,10 +123,10 @@ class MasterBar():
         self.lwrite = print
         self.now = 0
         self.total = total if total is not None else len(gen)
-        
+
     def __iter__(self):
         self.on_iter_begin()
-        for o in self.first_bar: 
+        for o in self.first_bar:
             self.now = o
             yield o
         self.on_iter_end()
@@ -280,7 +280,7 @@ class NBMasterBar(MasterBar):
         self.multiply_graph_set = True
         self.graph_fig,  graph_axes = plt.subplots(nrows=nrow, ncols=ncol, figsize=figsize)
         self.graph_axes= graph_axes.flatten()
- 
+
     def update_graph_multiply(self, graphs, x_bounds=None, y_bounds=None, figsize=(6,4)):
         if self.hide_graph: return
         if x_bounds is None: x_bounds = [None]*len(graphs)
@@ -367,13 +367,46 @@ class ConsoleMasterBar(MasterBar):
     def show_imgs(*args): pass
     def update_graph(*args): pass
 
+magic_char = "\033[F"
+import sys
+def multi_print_line(content, num=2,offset=0):
+    """
+    这个版本的print会在开始print的时候判断是否清除上一次的内容。
+    当num=0的时候不会清除，而是自然输出
+
+    """
+    # 回到初始输出位置
+    # back to the origin pos
+    lines = len(content)
+    if num>0:
+        print(magic_char * (lines-1+offset), end="")
+        sys.stdout.flush()
+
+    if isinstance(content, list):
+        for line in content:
+            print(line)
+    else:
+        raise TypeError("Excepting types: list, dict. Got: {}".format(type(content)))
+
+
 class tqdmBar(tqdm.tqdm):
     def __init__(self,*args,parent=None):
         super(tqdmBar,self).__init__(*args)
         self.now=0
-
+        self.parent = parent
     def lwrite(self,text,end=None):
         self.set_description(text)
+
+    @classmethod
+    def write_table(cls, table, num,offset=0,end="\n", nolock=False):
+        """
+        Print a message via tqdm (without overlap with bars)
+        """
+        #fp = file if file is not None else sys.stdout
+        with cls.external_write_mode(file=None, nolock=nolock):
+            multi_print_line(table,num,offset)
+            #sys.stdout.write(end)
+            #print(s)
 
     def update_step(self,val=1):
         if self.now >= self.total:

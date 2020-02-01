@@ -461,17 +461,16 @@ class ModelSaver:
 
         earlystopQ = stores.earlystop(score,max_length=self.early_stop_window,mode=self.early_stop_mode)
         if earlystopQ:return True
+        
         stores.update(score,model_num_save)
         if model_num_now < num:
             file_path = os.path.join(path,model_num_save)
             torch.save(model.state_dict(),file_path)
-            return
-
+            return False
 
         if score < stores.min(num):
             file_path = os.path.join(path,model_num_save)
             torch.save(model.state_dict(),file_path)
-
 
         name_should_save = set(stores.minpart(num)+[self.record_file_name])
         name__now___save = set(os.listdir(path))

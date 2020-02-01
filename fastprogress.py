@@ -394,19 +394,31 @@ class tqdmBar(tqdm.tqdm):
         super(tqdmBar,self).__init__(*args)
         self.now=0
         self.parent = parent
+
     def lwrite(self,text,end=None):
         self.set_description(text)
 
     @classmethod
-    def write_table(cls, table, num,offset=0,end="\n", nolock=False):
+    def write_table(self, table, num,offset=0,end="\n", nolock=False):
         """
         Print a message via tqdm (without overlap with bars)
         """
         #fp = file if file is not None else sys.stdout
-        with cls.external_write_mode(file=None, nolock=nolock):
+        with self.external_write_mode(file=None, nolock=nolock):
             multi_print_line(table,num,offset)
             #sys.stdout.write(end)
             #print(s)
+
+    def print(self,content,num,offset=0):
+        if isinstance(content,list):
+            lines = len(content)
+            content="\n".join(content)
+        else:
+            lines = 1
+        if num>0:
+            tqdm.tqdm.write(magic_char * (lines+offset), end="")
+            sys.stdout.flush()
+        tqdm.tqdm.write(content)
 
     def update_step(self,val=1):
         if self.now >= self.total:

@@ -32,6 +32,7 @@ class AverageMeter(object):
         self.avg=1.0*sum100/len(self.win100)
         self.output = self.avg
 
+
 class IdentyMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):
@@ -206,7 +207,7 @@ class RecordLoss:
         #mb.update_graph(graphs, x_bounds, y_bounds)
             #return ll
 
-    def auto_save_loss(self,path,file_name=None):
+    def auto_save_loss(self,path=None,file_name=None):
         if path is None:path = self.LogFile
         if not os.path.exists(path):os.makedirs(path)
         if file_name is None:file_name = self.mode+'.loss.log'
@@ -264,10 +265,10 @@ class LossStores:
     def __init__(self):
         self.store = {}
         self.last  = None
-
+        self.buffer = []
     def update(self,score,key_name):
         self.store[key_name] = score
-
+        self.buffer.append(score)
     def minpart(self,num):
         sort=sorted(self.store.items(), key=lambda d: d[1])
         return [key for key,val in sort[:num]]
@@ -275,6 +276,13 @@ class LossStores:
     def min(self,num):
         sort=sorted(self.store.items(), key=lambda d: d[1])
         return sort[num-1][1]
+
+    def earlystop(self,num,max_length=20,mode="no_min_more"):
+        if len(self.buffer)<=max_length:return False
+        window = self.buffer[-max_length:]
+        if mode == "no_min_more" and num > max(window):return True
+        if np.var(window) < 0.05*np.mean(window):return True
+        return False
 
 import time
 class ModelSaver:
@@ -284,14 +292,16 @@ class ModelSaver:
     record_file_name = "record.txt"
     def __init__(self,path,keep_latest_num=None, keep_best_num=None,
                           save_latest_form=None,save_best_form=None,
-                          get_num=None):
+                          get_num=None,
+                          es_max_window=20,es_mode="no_min_more"):
 
         self.root_path   = path
         self.latest_path = os.path.join(self.root_path,'routine')
         self.best_path   = os.path.join(self.root_path,'best')
         self.latest_record_file = os.path.join(self.latest_path,self.record_file_name)
         self.best_record_file   = os.path.join(self.best_path  ,self.record_file_name)
-
+        self.early_stop_window  = es_max_window
+        self.early_stop_mode    = es_mode
         if save_latest_form is None:save_latest_form = lambda x,y:"epoch-{}".format(x)
         if save_best_form   is None:save_best_form   = lambda x,y:"epoch-{}".format(x)
         if get_num is None:get_num = lambda x:x.split('|')[0].split('-')[1]
@@ -323,9 +333,6 @@ class ModelSaver:
         if not os.path.exists(path):
             print("Path:{} are not exist, which mean this project does not run".format(self.root_path))
             raise NotImplementedError
-
-
-
 
     def _load(self,load_mode):
         if load_mode == 'latest':
@@ -452,15 +459,19 @@ class ModelSaver:
             other_info = self._t2str(score)
             self.record_step(record_file,model_num_save,other_info)
 
+        earlystopQ = stores.earlystop(score,max_length=self.early_stop_window,mode=self.early_stop_mode)
+        if earlystopQ:return True
         stores.update(score,model_num_save)
         if model_num_now < num:
             file_path = os.path.join(path,model_num_save)
             torch.save(model.state_dict(),file_path)
             return
 
+
         if score < stores.min(num):
             file_path = os.path.join(path,model_num_save)
             torch.save(model.state_dict(),file_path)
+
 
         name_should_save = set(stores.minpart(num)+[self.record_file_name])
         name__now___save = set(os.listdir(path))
@@ -469,3 +480,4 @@ class ModelSaver:
         for name in name_should_del:
             real_path = os.path.join(path,name)
             os.remove(real_path)
+        return False

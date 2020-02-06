@@ -122,18 +122,36 @@ def table(data, headers=None, format_spec=FMT, width=WIDTH, align=ALIGN, style=S
     out.write('\n'.join(tablestr) + '\n')
     out.flush()
 
-def tablist(data, headers=None, format_spec=FMT, width=WIDTH, align=ALIGN, style=STYLE, out=sys.stdout):
+def tablist(data, headers=None, title=None,format_spec=FMT, width=WIDTH, align=ALIGN, style=STYLE, out=sys.stdout):
     # Number of columns in the table.
     ncols = len(data[0]) if headers is None else len(headers)
     tablestyle = STYLES[style]
+
+
     widths = parse_width(width, ncols)
+
 
     # Initialize with a hr or the header
     tablestr = [hrule(ncols, widths, tablestyle.top)] if headers is None else headerlist(headers, width=widths, align=align, style=style)
 
     # parse each row
     tablestr += [row(d, widths, format_spec, align, style) for d in data]
-
+    import numpy as np
+    if title is not None:
+        space_len = len(tablestr[0])-4
+        left_space = [""]*int(np.ceil((space_len-len(title))/2))
+        right_space= [""]*int(np.floor((space_len-len(title))/2))
+        title = " ".join(left_space)+title+" ".join(right_space)
+        title_str = titler([title], width=len(tablestr[0])-4, style=style)
+        if headers is not None:
+            a = list(tablestr[0])
+            b = list(tablestr[1])
+            a[0]=b[0]
+            a[-1]=b[-1]
+            tablestr[0]="".join(a)
+            # tablestr[0][0]=tablestr[1][0]
+            # tablestr[0][-1]=tablestr[1][-1]
+        tablestr = [title_str]+tablestr
     # only add the final border if there was data in the table
     if len(data) > 0:
         tablestr += [hrule(ncols, widths, tablestyle.bottom)]
@@ -213,6 +231,41 @@ def header(headers, width=WIDTH, align=ALIGN, style=STYLE, add_hr=True):
 
     return headerstr
 
+def titler(headers, width=WIDTH, align=ALIGN, style=STYLE, add_hr=True):
+    """Returns a formatted row of column header strings
+
+    Parameters
+    ----------
+    headers : list of strings
+        A list of n strings, the column headers
+
+    width : int
+        The width of each column (Default: 11)
+
+    style : string or tuple, optional
+        A formatting style (see STYLES)
+
+    Returns
+    -------
+    headerstr : string
+        A string consisting of the full header row to print
+    """
+    tablestyle = STYLES[style]
+    widths = parse_width(width, len(headers))
+    alignment = ALIGNMENTS[align]
+
+    # string formatter
+    data = map(lambda x: ('{:%s%d}' % (alignment, x[0] + ansi_len(x[1]))).format(x[1]), zip(widths, headers))
+
+    # build the formatted str
+    headerstr = format_line(data, tablestyle.row)
+
+    if add_hr:
+        upper = hrule(len(headers), widths, tablestyle.top)
+        #lower = hrule(len(headers), widths, tablestyle.below_header)
+        headerstr = '\n'.join([upper, headerstr])
+
+    return headerstr
 
 def row(values, width=WIDTH, format_spec=FMT, align=ALIGN, style=STYLE):
     """Returns a formatted row of data

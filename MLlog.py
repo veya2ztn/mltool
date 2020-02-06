@@ -269,6 +269,7 @@ class LossStores:
     def update(self,score,key_name):
         self.store[key_name] = score
         self.buffer.append(score)
+
     def minpart(self,num):
         sort=sorted(self.store.items(), key=lambda d: d[1])
         return [key for key,val in sort[:num]]
@@ -281,7 +282,7 @@ class LossStores:
         if len(self.buffer)<=max_length:return False
         window = self.buffer[-max_length:]
         if mode == "no_min_more" and num > max(window):return True
-        if np.var(window) < 0.05*np.mean(window):return True
+        #if np.var(window) < 0.05*np.mean(window):return True
         return False
 
 import time
@@ -461,8 +462,8 @@ class ModelSaver:
 
         earlystopQ = stores.earlystop(score,max_length=self.early_stop_window,mode=self.early_stop_mode)
         if earlystopQ:return True
-        
-        stores.update(score,model_num_save)
+
+        #stores.update(score,model_num_save)
         if model_num_now < num:
             file_path = os.path.join(path,model_num_save)
             torch.save(model.state_dict(),file_path)

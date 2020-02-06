@@ -38,3 +38,10 @@ def send_message(text,successQ):
         print('sand a {} message'.format("success" if successQ else "fail"))
     except smtplib.SMTPException as e:
         print('error',e) #打印错误
+
+import sys
+if __name__=="__main__":
+    assert len(sys.argv)>2
+    text    = sys.argv[1]
+    successQ= sys.argv[2]
+    send_message(text,successQ)

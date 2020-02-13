@@ -99,6 +99,9 @@ from .fastprogress import isnotebook
 import tensorwatch as tw
 
 IS_NOTEBOOK=isnotebook()
+
+import collections
+
 class RecordLoss:
 
     def __init__(self,loss_records=None,
@@ -263,13 +266,13 @@ class RecordLoss:
 
 class LossStores:
     def __init__(self):
-        self.store = {}
+        self.store = collections.OrderedDict()
         self.last  = None
-        self.buffer = []
     def update(self,score,key_name):
         self.store[key_name] = score
-        self.buffer.append(score)
 
+    def reload(self):
+        self.store = collections.OrderedDict()
     def minpart(self,num):
         sort=sorted(self.store.items(), key=lambda d: d[1])
         return [key for key,val in sort[:num]]
@@ -279,6 +282,7 @@ class LossStores:
         return sort[num-1][1]
 
     def earlystop(self,num,max_length=20,mode="no_min_more"):
+        self.buffer = self.store.values()
         if len(self.buffer)<=max_length:return False
         window = self.buffer[-max_length:]
         if mode == "no_min_more" and num > max(window):return True
@@ -358,6 +362,7 @@ class ModelSaver:
             self.model_last_num = int(last_num) if last_num != 'start' else -1
             self.weight_last_name = last_line if last_num != 'start' else None
             if load_mode == 'best':
+                self.model_loss_store.reload()
                 for line in body_lines:
                     if "#" in line : continue
                     line_list = line.strip().split(' ')
@@ -452,6 +457,7 @@ class ModelSaver:
             model_num_now = self.model_last_num+1
             model_num_save= self.save_best_form(model_num_now,score)
 
+
         if isinstance(score,list) or isinstance(score,np.ndarray):
             other_info = " ".join([self._t2str(s) for s in score])
             self.record_step(record_file,model_num_save,other_info)
@@ -463,7 +469,8 @@ class ModelSaver:
         earlystopQ = stores.earlystop(score,max_length=self.early_stop_window,mode=self.early_stop_mode)
         if earlystopQ:return True
 
-        #stores.update(score,model_num_save)
+        stores.update(score,model_num_save)
+
         if model_num_now < num:
             file_path = os.path.join(path,model_num_save)
             torch.save(model.state_dict(),file_path)

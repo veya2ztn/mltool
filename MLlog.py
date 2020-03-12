@@ -268,6 +268,7 @@ class LossStores:
     def __init__(self):
         self.store = collections.OrderedDict()
         self.last  = None
+        self.nbm_c = 0
     def update(self,score,key_name):
         self.store[key_name] = score
 
@@ -281,12 +282,22 @@ class LossStores:
         sort=sorted(self.store.items(), key=lambda d: d[1])
         return sort[num-1][1]
 
-    def earlystop(self,num,max_length=20,mode="no_min_more"):
-        self.buffer = self.store.values()
+    def earlystop(self,num,max_length=20,anti_over_fit_length=50,mode="no_min_more"):
+        self.buffer = list(self.store.values())
         if len(self.buffer)<=max_length:return False
+
+        # if mode == "no_better_more":
+        #     if num < self.buffer[-1]:
+        #         self.nbm_c = 0
+        #     else:
+        #         self.nbm_c += 1
+        #     if self.nbm_c>5:return True
         window = self.buffer[-max_length:]
-        if mode == "no_min_more" and num > max(window):return True
+        if mode == "no_min_more_20" and num > max(window):return True
         #if np.var(window) < 0.05*np.mean(window):return True
+        the_min = min(self.buffer)
+        anti_over_fit_min = self.buffer[-anti_over_fit_length:]
+        if min(anti_over_fit_min)>the_min = min(self.buffer):return True
         return False
 
 import time
@@ -447,7 +458,7 @@ class ModelSaver:
         weight_path=os.path.join(path,weight_best_name)
         return weight_path
 
-    def save_best_model(self,model,score,keep_num=None,model_num_save=None,epoch=None,ForceQ=False):
+    def save_best_model(self,model,score,keep_num=None,model_num_save=None,epoch=None,ForceQ=False,doearlystop=True):
         path,record_file=self._load('best')
         stores = self.model_loss_store
         num    = keep_num if keep_num is not None else self.keep_best_num
@@ -467,7 +478,7 @@ class ModelSaver:
             self.record_step(record_file,model_num_save,other_info)
 
         earlystopQ = stores.earlystop(score,max_length=self.early_stop_window,mode=self.early_stop_mode)
-        if earlystopQ:return True
+        if earlystopQ and doearlystop:return True
 
         stores.update(score,model_num_save)
 

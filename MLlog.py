@@ -295,9 +295,8 @@ class LossStores:
         window = self.buffer[-max_length:]
         if mode == "no_min_more_20" and num > max(window):return True
         #if np.var(window) < 0.05*np.mean(window):return True
-        the_min = min(self.buffer)
         anti_over_fit_min = self.buffer[-anti_over_fit_length:]
-        if min(anti_over_fit_min)>the_min = min(self.buffer):return True
+        if min(anti_over_fit_min)>min(self.buffer):return True
         return False
 
 import time

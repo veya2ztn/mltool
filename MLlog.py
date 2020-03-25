@@ -229,8 +229,8 @@ class RecordLoss:
         if filename is None:filename = 'weights-{:07d}'.format(self.step_now)
         if not os.path.exists(path):os.makedirs(path)
         file_path = os.path.join(path,filename)
-        torch.save(model.state_dict(),file_path)
-
+        #torch.save(model.state_dict(),file_path)
+        model.save_to(file_path)
     def print2file(self,step,file_name):
         with open(file_name,'a') as log_file:
             ll=["{:.4f}".format(self.record_latest_loss(recorder)) for recorder in self.loss_records]
@@ -250,12 +250,14 @@ class RecordLoss:
         stores = self.model_loss_store
         if len(stores.store)<num:
             file_path = os.path.join(path,filename)
-            torch.save(model.state_dict(),file_path)
+            #torch.save(model.state_dict(),file_path)
+            model.save_to(file_path)
             stores.update(score,filename)
             return
         if score < stores.min(num):
             file_path = os.path.join(path,filename)
-            torch.save(model.state_dict(),file_path)
+            #torch.save(model.state_dict(),file_path)
+            model.save_to(file_path)
             stores.update(score,filename)
         name_should_save = set(stores.minpart(num))
         name__now___save = set(os.listdir(path))
@@ -446,7 +448,8 @@ class ModelSaver:
             model_num_now = self.model_last_num+1
             model_num_save= self.save_latest_form(model_num_now,other_info)
         real_path = os.path.join(path,model_num_save)
-        torch.save(model.state_dict(),real_path)
+        #torch.save(model.state_dict(),real_path)
+        model.save_to(real_path)
         self.record_step(record_file,model_num_save,other_info)
         self.keep_latest(keep_num)
 
@@ -483,12 +486,14 @@ class ModelSaver:
 
         if model_num_now < num:
             file_path = os.path.join(path,model_num_save)
-            torch.save(model.state_dict(),file_path)
+            #torch.save(model.state_dict(),file_path)
+            model.save_to(file_path)
             return False
 
         if score < stores.min(num):
             file_path = os.path.join(path,model_num_save)
-            torch.save(model.state_dict(),file_path)
+            #torch.save(model.state_dict(),file_path)
+            model.save_to(file_path)
 
         name_should_save = set(stores.minpart(num)+[self.record_file_name])
         name__now___save = set(os.listdir(path))

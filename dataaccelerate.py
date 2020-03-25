@@ -13,16 +13,19 @@ def sendall2gpu(listinlist,device):
         return out
     else:
         return listinlist.float().to(device=device, non_blocking=True)
-    
+
 class DataLoaderX(DataLoader):
 
     def __iter__(self):
         return BackgroundGenerator(super().__iter__())
 
-    
+
 class DataSimfetcher():
     def __init__(self, loader, device='auto'):
-        if device == 'auto':self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        if device == 'auto':
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = device
         self.loader = iter(loader)
 
     def next(self):
@@ -32,8 +35,8 @@ class DataSimfetcher():
         except StopIteration:
             self.batch = None
         return self.batch
-        
-         
+
+
 
 class DataPrefetcher():
     def __init__(self, loader, device='auto'):

@@ -178,7 +178,7 @@ def text2html_table(items):
     return html_code
 
 class NBProgressBar(ProgressBar):
-    def __init__(self, gen, total=None, display=True, leave=True, parent=None, auto_update=True):
+    def __init__(self, gen, total=None, display=True, leave=True, parent=None, auto_update=True,**kargs):
         self.progress = html_progress_bar(0, len(gen) if total is None else total, "")
         super().__init__(gen, total, display, leave, parent, auto_update)
 
@@ -204,7 +204,7 @@ class NBProgressBar(ProgressBar):
 
 class NBMasterBar(MasterBar):
     names = ['train', 'valid']
-    def __init__(self, gen, total=None, hide_graph=False, order=None, clean_on_interrupt=False, total_time=False):
+    def __init__(self, gen, total=None, hide_graph=False, order=None, clean_on_interrupt=False, total_time=False,**kargs):
         super().__init__(gen, NBProgressBar, total)
         self.report,self.clean_on_interrupt,self.total_time = [],clean_on_interrupt,total_time
         self.text,self.lines = "",[]
@@ -390,8 +390,8 @@ def multi_print_line(content, num=2,offset=0):
 
 
 class tqdmBar(tqdm.tqdm):
-    def __init__(self,*args,parent=None):
-        super(tqdmBar,self).__init__(*args)
+    def __init__(self,*args,parent=None,**kargs):
+        super(tqdmBar,self).__init__(*args,**kargs)
         self.now=0
         self.parent = parent
 

@@ -119,7 +119,8 @@ class RecordLoss:
         self.save_model_step = save_model_step
         self.auto_plot  = True
         self.mb = None
-        self.method="tensorwatch" if not IS_NOTEBOOK else "notebook"
+        self.method="" if not IS_NOTEBOOK else "notebook"
+        ### force self.method="tensorwatch" if you want to use tensorwatch
         self.mode = mode
         self.LogFile = log_file
         if not os.path.exists(log_file):os.makedirs(log_file)
@@ -127,7 +128,7 @@ class RecordLoss:
         self.watch = None
         self.streams= None
         self.twwatchQ=True
-
+        self.auto_loss_saveQ = True
     def initial(self,num):
         if self.loss_records is None:self.loss_records = [AverageMeter() for i in range(num)]
         assert len(self.loss_records) == num
@@ -188,8 +189,7 @@ class RecordLoss:
             if loss:g.add_y(loss)
             data_list.append(loss)
 
-        if self.auto_plot and IS_NOTEBOOK and self.mb is not None:
-            self.update_graph(self.mb)
+        if self.auto_plot and IS_NOTEBOOK and (self.mb is not None):self.update_graph(self.mb)
 
         if self.method == "tensorwatch" and self.twwatchQ:
             self.check_watch()
@@ -219,7 +219,7 @@ class RecordLoss:
         # if self.step_now == 0:
         #     with open(file_name,'w') as log_file:
         #         log_file.write('')
-        self.print2file(self.step_now,file_name)
+        if self.auto_loss_saveQ:self.print2file(self.step_now,file_name)
 
     def auto_save_model(self,model,path,filename=None):
         if self.step_now%self.save_model_step !=0: return

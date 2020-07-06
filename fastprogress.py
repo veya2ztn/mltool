@@ -117,6 +117,13 @@ class ProgressBar():
         self.now+=val
         return True
 
+    def restart(self,gen):
+        total=self.total
+        display=self.display
+        leave=self.leave
+        parent=self.parent
+        auto_update=self.auto_update
+        self.__init__(gen, total=total, display=display, leave=leave, parent=parent, auto_update=auto_update)
 class MasterBar():
     def __init__(self, gen, cls, total=None):
         self.first_bar = cls(gen, total=total, display=False)
@@ -141,7 +148,6 @@ class MasterBar():
         self.on_iter_begin()
         self.update(val)
         self.on_iter_end()
-
 
 def html_progress_bar(value, total, label, interrupted=False):
     bar_style = 'progress-bar-interrupted' if interrupted else ''
@@ -178,7 +184,7 @@ def text2html_table(items):
     return html_code
 
 class NBProgressBar(ProgressBar):
-    def __init__(self, gen, total=None, display=True, leave=True, parent=None, auto_update=True,**kargs):
+    def __init__(self, gen=None, total=None, display=True, leave=True, parent=None, auto_update=True,**kargs):
         self.progress = html_progress_bar(0, len(gen) if total is None else total, "")
         super().__init__(gen, total, display, leave, parent, auto_update)
 
@@ -204,7 +210,7 @@ class NBProgressBar(ProgressBar):
 
 class NBMasterBar(MasterBar):
     names = ['train', 'valid']
-    def __init__(self, gen, total=None, hide_graph=False, order=None, clean_on_interrupt=False, total_time=False,**kargs):
+    def __init__(self, gen=None, total=None, hide_graph=False, order=None, clean_on_interrupt=False, total_time=False,**kargs):
         super().__init__(gen, NBProgressBar, total)
         self.report,self.clean_on_interrupt,self.total_time = [],clean_on_interrupt,total_time
         self.text,self.lines = "",[]
@@ -236,7 +242,7 @@ class NBMasterBar(MasterBar):
     def add_child(self, child):
         self.child = child
         self.inner_dict['pb2'] = self.child.progress
-        self.show()
+        if hasattr(self,'out'):self.show()
 
     def show(self):
         self.inner_dict['pb1'], self.inner_dict['text'] = self.first_bar.progress, self.text
@@ -306,67 +312,6 @@ class NBMasterBar(MasterBar):
             if y_bound is not None: graph_ax.set_ylim(*y_bound)
         self.graph_out.update(self.graph_axes[0].figure)
 
-class ConsoleProgressBar(ProgressBar):
-    fill:str='█'
-
-    def __init__(self, gen, total=None, display=True, leave=True, parent=None, auto_update=True, txt_len=60):
-        self.cols,_ = shutil.get_terminal_size((100, 40))
-        if self.cols > MAX_COLS: self.cols=MAX_COLS
-        self.length = self.cols-txt_len
-        self.max_len,self.prefix = 0,''
-        try: print(self.fill, end='\r')
-        except: self.fill = 'X'
-        super().__init__(gen, total, display, leave, parent, auto_update)
-
-    def on_interrupt(self):
-        self.on_iter_end()
-
-    def on_iter_end(self):
-        if not self.leave and printing():
-            print(f'\r{self.prefix}' + ' ' * (self.max_len - len(f'\r{self.prefix}')), end = '\r')
-
-    def on_update(self, val, text):
-        if self.display:
-            if self.length > self.cols-len(text)-len(self.prefix)-4:
-                self.length = self.cols-len(text)-len(self.prefix)-4
-            filled_len = int(self.length * val // self.total) if self.total else 0
-            bar = self.fill * filled_len + '-' * (self.length - filled_len)
-            to_write = f'\r{self.prefix} |{bar}| {text}'
-            if len(to_write) > self.max_len: self.max_len=len(to_write)
-            if printing(): print(to_write, end = '\r')
-
-class ConsoleMasterBar(MasterBar):
-    def __init__(self, gen, total=None, hide_graph=False, order=None, clean_on_interrupt=False, total_time=False):
-        super().__init__(gen, ConsoleProgressBar, total)
-        self.total_time = total_time
-
-    def add_child(self, child):
-        self.child = child
-        self.child.prefix = f'Epoch {self.first_bar.last_v+1}/{self.first_bar.total} :'
-        self.child.display = True
-
-    def on_iter_begin(self):
-        super().on_iter_begin()
-        if SAVE_PATH is not None and os.path.exists(SAVE_PATH) and not SAVE_APPEND:
-            with open(SAVE_PATH, 'w') as f: f.write('')
-
-    def write(self, line, table=False,end=None):
-        if table:
-            text = ''
-            if not hasattr(self, 'names'):
-                self.names = [name + ' ' * (8-len(name)) if len(name) < 8 else name for name in line]
-                text = '  '.join(self.names)
-            else:
-                for (t,name) in zip(line,self.names): text += t + ' ' * (2 + len(name)-len(t))
-            print_and_maybe_save(text,end)
-        else: print_and_maybe_save(line,end)
-        if self.total_time:
-            total_time = format_time(time() - self.start_t)
-            print_and_maybe_save(f'Total time: {total_time}',end=None)
-
-    def show_imgs(*args): pass
-    def update_graph(*args): pass
-
 magic_char = "\033[F"
 import sys
 def multi_print_line(content, num=2,offset=0):
@@ -388,7 +333,6 @@ def multi_print_line(content, num=2,offset=0):
     else:
         raise TypeError("Excepting types: list, dict. Got: {}".format(type(content)))
 
-
 class tqdmBar(tqdm.tqdm):
     def __init__(self,*args,parent=None,**kargs):
         super(tqdmBar,self).__init__(*args,**kargs)
@@ -403,11 +347,8 @@ class tqdmBar(tqdm.tqdm):
         """
         Print a message via tqdm (without overlap with bars)
         """
-        #fp = file if file is not None else sys.stdout
-        with self.external_write_mode(file=None, nolock=nolock):
-            multi_print_line(table,num,offset)
-            #sys.stdout.write(end)
-            #print(s)
+        tqdm.tqdm.write(magic_char * (len(table)+1), end="")
+        for line in table:tqdm.tqdm.write(line)
 
     def print(self,content,num,offset=0):
         if isinstance(content,list):
@@ -420,9 +361,14 @@ class tqdmBar(tqdm.tqdm):
             sys.stdout.flush()
         tqdm.tqdm.write(content)
 
+    def restart(self,**kargs):
+        self.reset(**kargs)
+        self.now = 0
+
     def update_step(self,val=1):
         if self.now >= self.total:
-            self.close()
+            self.refresh()
+            #self.close()
             return False
         self.update(val)
         self.now+=val
@@ -440,6 +386,3 @@ def printing():
 
 if IN_NOTEBOOK: master_bar, progress_bar = NBMasterBar, NBProgressBar
 else:           master_bar, progress_bar = tqdmBar, tqdmBar
-
-def force_console_behavior():
-    return ConsoleMasterBar, ConsoleProgressBar

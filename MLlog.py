@@ -287,16 +287,10 @@ class LossStores:
     def earlystop(self,num,max_length=20,anti_over_fit_length=50,mode="no_min_more"):
         self.buffer = list(self.store.values())
         if len(self.buffer)<=max_length:return False
-
-        # if mode == "no_better_more":
-        #     if num < self.buffer[-1]:
-        #         self.nbm_c = 0
-        #     else:
-        #         self.nbm_c += 1
-        #     if self.nbm_c>5:return True
         window = self.buffer[-max_length:]
-        if mode == "no_min_more_20" and num > max(window):return True
-        #if np.var(window) < 0.05*np.mean(window):return True
+        if mode == "no_min_more_20":
+            if num > max(window)*0.98:return True
+            if num - max(window)<0.0001:return True
         anti_over_fit_min = self.buffer[-anti_over_fit_length:]
         if min(anti_over_fit_min)>min(self.buffer):return True
         return False

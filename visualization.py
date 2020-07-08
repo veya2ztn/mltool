@@ -1,6 +1,10 @@
 import cv2
 from PIL import Image, ImageOps, ImageStat, ImageDraw
-import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+try:
+    import matplotlib.pyplot as plt
+except:
+    pass
 import numpy as np
 
 def gray_print(img):
@@ -8,7 +12,7 @@ def gray_print(img):
 def rgb_print(img):
     img_rgb=img[:,:,[2,1,0]]
     plt.imshow(img_rgb,'gray')
-#plt.rcParams['figure.figsize'] = (10.0, 8.0) 
+#plt.rcParams['figure.figsize'] = (10.0, 8.0)
 def draw_line(image,shape,color='white',mode='xywh'):
     img = image.copy()
     dim = len(img.shape)
@@ -42,3 +46,22 @@ def draw_line(image,shape,color='white',mode='xywh'):
                 x1, y1, x2, y2 = int(x1s[i]), int(y1s[i]), int(x2s[i]), int(y2s[i])
                 _=cv2.rectangle(img,(x1, y1),(x2, y2),color,2)
         return img
+
+def smoothhist(data,**kargs):
+    density = gaussian_kde(data)
+    xs = np.linspace(min(data),max(data),200)
+    density.covariance_factor = lambda : .25
+    density._compute_covariance()
+    plt.plot(xs,density(xs),**kargs)
+
+def smoothheatdensity(x,y):
+    data = np.vstack([x, y])
+    kde = gaussian_kde(data)
+
+    # evaluate on a regular grid
+    xgrid = np.linspace(min(x), max(x),40)
+    ygrid = np.linspace(min(y), max(y),40)
+    Xgrid, Ygrid = np.meshgrid(xgrid, ygrid)
+    Z = kde.evaluate(np.vstack([Xgrid.ravel(), Ygrid.ravel()]))
+    # Plot the result as an image
+    plt.imshow(Z.reshape(Xgrid.shape),origin='lower', aspect='auto',extent=[min(x), max(x), min(y), max(y)], cmap='Blues')

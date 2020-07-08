@@ -284,13 +284,13 @@ class LossStores:
         sort=sorted(self.store.items(), key=lambda d: d[1])
         return sort[num-1][1]
 
-    def earlystop(self,num,max_length=20,anti_over_fit_length=50,mode="no_min_more"):
+    def earlystop(self,num,max_length=20,anti_over_fit_length=30,mode="no_min_more"):
         self.buffer = list(self.store.values())
         if len(self.buffer)<=max_length:return False
         window = self.buffer[-max_length:]
-        if mode == "no_min_more_20":
-            if num > max(window)*0.98:return True
-            if num - max(window)<0.0001:return True
+        if mode == "no_min_more":
+            #if num > max(window)*0.99:return True
+            if num > max(window)-0.00001:return True
         anti_over_fit_min = self.buffer[-anti_over_fit_length:]
         if min(anti_over_fit_min)>min(self.buffer):return True
         return False

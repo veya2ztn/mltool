@@ -361,8 +361,11 @@ class tqdmBar(tqdm.tqdm):
             sys.stdout.flush()
         tqdm.tqdm.write(content)
 
-    def restart(self,**kargs):
-        self.reset(**kargs)
+    def restart(self,total=1):
+        if not self.disable:
+            self.reset(total=total)
+        else:
+            self.total =total
         self.now = 0
 
     def update_step(self,val=1):

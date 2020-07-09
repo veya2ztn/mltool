@@ -1,7 +1,8 @@
-from mltool.MLlog import ModelSaver,AverageMeter,RecordLoss,Curve_data,IdentyMeter,LossStores
-from mltool.fastprogress import master_bar, progress_bar,isnotebook
+from .MLlog import ModelSaver,AverageMeter,RecordLoss,Curve_data,IdentyMeter,LossStores
+from .fastprogress import master_bar, progress_bar,isnotebook
 from tensorboardX import SummaryWriter
 import tensorboardX
+import os
 class LoggingSystem:
     '''
     How to use:
@@ -19,11 +20,14 @@ class LoggingSystem:
         self.recorder      = None
         self.Q_recorder_type = 'tensorboard'
         self.Q_batch_loss_record = False
+        self.master_bar = None
     def train(self):
+        if not self.global_do_log:return
         self.progress_bar = self.train_bar
         self.recorder     = self.train_recorder
 
     def eval(self):
+        if not self.global_do_log:return
         self.progress_bar = self.valid_bar
         self.recorder     = self.valid_recorder
 
@@ -37,7 +41,7 @@ class LoggingSystem:
 
 
     def create_master_bar(self,batches,banner_info=None):
-        if banner_info is not None:print(banner_info)
+        if banner_info is not None and self.global_do_log:print(banner_info)
         self.master_bar = master_bar(range(batches), disable=self.diable_logbar)
         return self.master_bar
 

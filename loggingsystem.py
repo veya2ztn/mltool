@@ -104,7 +104,7 @@ class LoggingSystem:
         if not self.global_do_log:return
         if self.Q_recorder_type == 'tensorboard':
             self.recorder.export_scalars_to_json(os.path.join(self.ckpt_root,"all_scalars.json"))
+            self.recorder.close()
         self.master_bar.close()
         self.train_bar.close()
         self.valid_bar.close()
-        self.recorder.close()

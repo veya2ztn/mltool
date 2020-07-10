@@ -484,15 +484,13 @@ class ModelSaver:
             model.save_to(file_path)
             return False
 
-        if score < stores.min(num):
+        if score <= stores.min(num):
             file_path = os.path.join(path,model_num_save)
             #torch.save(model.state_dict(),file_path)
             model.save_to(file_path)
-
         name_should_save = set(stores.minpart(num)+[self.record_file_name])
         name__now___save = set(os.listdir(path))
         name_should_del  = name__now___save.difference(name_should_save)
-
         for name in name_should_del:
             real_path = os.path.join(path,name)
             os.remove(real_path)

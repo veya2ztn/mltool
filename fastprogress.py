@@ -117,13 +117,13 @@ class ProgressBar():
         self.now+=val
         return True
 
-    def restart(self,gen):
-        total=self.total
+    def restart(self,total=None):
+
         display=self.display
         leave=self.leave
         parent=self.parent
         auto_update=self.auto_update
-        self.__init__(gen, total=total, display=display, leave=leave, parent=parent, auto_update=auto_update)
+        self.__init__(gen=None, total=total, display=display, leave=leave, parent=parent, auto_update=auto_update)
 class MasterBar():
     def __init__(self, gen, cls, total=None):
         self.first_bar = cls(gen, total=total, display=False)
@@ -207,6 +207,8 @@ class NBProgressBar(ProgressBar):
         self.progress = html_progress_bar(val, self.total, text, interrupted)
         if self.display: self.out.update(HTML(self.progress))
         elif self.parent is not None: self.parent.show()
+
+
 
 class NBMasterBar(MasterBar):
     names = ['train', 'valid']

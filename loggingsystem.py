@@ -21,6 +21,7 @@ class LoggingSystem:
         self.Q_recorder_type = 'tensorboard'
         self.Q_batch_loss_record = False
         self.master_bar = None
+
     def train(self):
         if not self.global_do_log:return
         self.progress_bar = self.train_bar
@@ -75,16 +76,16 @@ class LoggingSystem:
         self.recorder.file_writer.add_summary(sei)
         return self.recorder
 
-    def save_best_ckpt(self,model,loss_list):
+    def save_best_ckpt(self,model,loss_list,**kargs):
         if not self.global_do_log:return False
         model = model.module if hasattr(model,'module') else model
-        return self.model_saver.save_best_model(model,loss_list)
+        return self.model_saver.save_best_model(model,loss_list,**kargs)
 
-    def save_latest_ckpt(self,model):
+    def save_latest_ckpt(self,model,**kargs):
         if not self.global_do_log:return
         if model is None:raise
         model = model.module if hasattr(model,'module') else model
-        self.model_saver.save_latest_model(model)
+        self.model_saver.save_latest_model(model,**kargs)
 
     def runtime_log_table(self,table_string):
         if not self.global_do_log:return

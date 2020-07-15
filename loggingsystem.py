@@ -53,9 +53,10 @@ class LoggingSystem:
             self.progress_bar = progress_bar(range(batches), disable=self.diable_logbar,parent=self.master_bar,**kargs)
         return self.progress_bar
 
-    def create_model_saver(self,**kargs):
+    def create_model_saver(self,path=None,**kargs):
         if not self.global_do_log:return
-        self.model_saver = ModelSaver(self.ckpt_root,**kargs)
+        if path is None:path=self.ckpt_root
+        self.model_saver = ModelSaver(path,**kargs)
 
     def create_recorder(self,**kargs):
         if not self.global_do_log:return

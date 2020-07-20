@@ -24,7 +24,7 @@ __all__ = ('table', 'header', 'row', 'hrule', 'top', 'bottom', 'banner', 'datafr
 
 # Defaults
 STYLE = 'round'
-WIDTH = 11
+WIDTH = 14
 FMT = '5g'
 ALIGN = 'right'
 ALIGNMENTS = {"left": "<", "right": ">", "center": "^"}
@@ -126,11 +126,7 @@ def tablist(data, headers=None, title=None,format_spec=FMT, width=WIDTH, align=A
     # Number of columns in the table.
     ncols = len(data[0]) if headers is None else len(headers)
     tablestyle = STYLES[style]
-
-
     widths = parse_width(width, ncols)
-
-
     # Initialize with a hr or the header
     tablestr = [hrule(ncols, widths, tablestyle.top)] if headers is None else headerlist(headers, width=widths, align=align, style=style)
 

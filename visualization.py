@@ -52,7 +52,10 @@ def smoothhist(data,**kargs):
     xs = np.linspace(min(data),max(data),200)
     density.covariance_factor = lambda : .25
     density._compute_covariance()
-    plt.plot(xs,density(xs),**kargs)
+    x = xs
+    y = density(xs)
+    y = y/y.max()
+    plt.plot(x,y,**kargs)
 
 def smoothheatdensity(x,y):
     data = np.vstack([x, y])

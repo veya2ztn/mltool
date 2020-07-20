@@ -296,7 +296,10 @@ class LossStores:
         return False
 
 import time
-class ModelSaver:
+
+
+
+class ModelSaver_deprecated:
     '''
     Load the path
     '''
@@ -464,7 +467,6 @@ class ModelSaver:
             model_num_now = self.model_last_num+1
             model_num_save= self.save_best_form(model_num_now,score)
 
-
         if isinstance(score,list) or isinstance(score,np.ndarray):
             other_info = " ".join([self._t2str(s) for s in score])
             self.record_step(record_file,model_num_save,other_info)
@@ -494,4 +496,76 @@ class ModelSaver:
         for name in name_should_del:
             real_path = os.path.join(path,name)
             os.remove(real_path)
+        return False
+import json
+from collections import OrderedDict
+
+class ModelSaver:
+    def __init__(self,path,accu_list,es_max_window=20,es_mode="no_min_more",**kargs):
+        self.status_file  = os.path.join(path,'saver_info.json')
+        self.routine_path = os.path.join(path,'routine')
+        if not os.path.exists(self.routine_path):os.makedirs(self.routine_path)
+        self.best_path    = os.path.join(path,'best')
+        if not os.path.exists(self.best_path):os.makedirs(self.best_path)
+        self.early_stop_window  = es_max_window
+        self.early_stop_mode    = es_mode
+        self.accu_list    = accu_list
+        self.loss_stores  = {}
+        for accu_type in accu_list:self.loss_stores[accu_type]=LossStores()
+        self.temp_info    = {}
+        if not os.path.exists(self.status_file):
+            self._initial()
+        else:
+            self._reload()
+    def _initial(self):
+        status_now = {}
+        status_now['now_epoch'] = -1
+        status_now['routine']   = OrderedDict()
+        self._save_status(status_now)
+    def _reload(self):
+        status_now = self._get_status()
+        for epoch,pool in status_now['routine']:
+            for accu_type in self.accu_list:
+                self.loss_stores[accu_type].update(accu,epoch)
+    def _get_status(self):
+        # the _status record in a json file named "saver_info.json"
+        with open(self.status_file,'r') as f:status_now = json.load(f)
+        return status_now
+    def _save_status(self,status_now):
+        with open(self.status_file,'w') as f:_=json.dump(status_now,f)
+    def save_latest_model(self,model,epoch):
+        time_at_save = time.strftime("%m_%d_%H_%M")
+        ### model saving.............
+        name_at_save = "latest_weight_now"
+        path_at_save = os.path.join(self.routine_path,name_at_save)
+        model.save_to(path_at_save)
+    def save_best_model(self,model,accu_pool,epoch,doearlystop=True):
+        status_now = self._get_status()
+        total_estop= 0
+        for accu_type in self.accu_list:
+            accu = accu_pool[accu_type]
+            best = accu_pool['best_'+accu_type]
+            if accu <= best:
+                name_at_save = 'best_{}_{:.4f}'.format(accu_type,accu)
+                path_at_save = os.path.join(self.best_path,name_at_save)
+                model.save_to(path_at_save)
+                status_now['best_'+accu_type]={'epoch':epoch,'score':accu}
+                ### remove last save path
+                temp_key =  f'last_best_{accu_type}_path'
+                if temp_key in self.temp_info:
+                    last_best_path = self.temp_info[temp_key]
+                    if os.path.exists(last_best_path):os.remove(last_best_path)
+                else:
+                    self.temp_info[temp_key] = path_at_save
+            earlystopQ = self.loss_stores[accu_type].earlystop(accu,max_length=self.early_stop_window,mode=self.early_stop_mode)
+            total_estop+=earlystopQ
+            self.loss_stores[accu_type].update(accu,epoch)
+
+        status_now['now_epoch'] = epoch
+        time_at_save= time.strftime("%m_%d_%H_%M")
+        status_now['routine'][epoch]=accu_pool
+        status_now['routine'][epoch]['time']=time_at_save
+        self._save_status(status_now)
+        earlystopQ = (total_estop>=len(self.accu_list))
+        if earlystopQ and doearlystop:return True
         return False

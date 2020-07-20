@@ -40,7 +40,12 @@ class LoggingSystem:
             self.recorder.step([value])
             self.recorder.auto_save_loss()
 
+    
 
+    def add_figure(self,name,figure,epoch):
+        if not self.global_do_log:return
+        if self.Q_recorder_type == 'tensorboard':
+            self.recorder.add_figure(name,figure,epoch)
     def create_master_bar(self,batches,banner_info=None):
         if banner_info is not None and self.global_do_log:print(banner_info)
         self.master_bar = master_bar(range(batches), disable=self.diable_logbar)
@@ -53,10 +58,10 @@ class LoggingSystem:
             self.progress_bar = progress_bar(range(batches), disable=self.diable_logbar,parent=self.master_bar,**kargs)
         return self.progress_bar
 
-    def create_model_saver(self,path=None,**kargs):
+    def create_model_saver(self,path=None,accu_list=None,**kargs):
         if not self.global_do_log:return
         if path is None:path=self.ckpt_root
-        self.model_saver = ModelSaver(path,**kargs)
+        self.model_saver = ModelSaver(path,accu_list,**kargs)
 
     def create_recorder(self,**kargs):
         if not self.global_do_log:return
@@ -77,16 +82,16 @@ class LoggingSystem:
         self.recorder.file_writer.add_summary(sei)
         return self.recorder
 
-    def save_best_ckpt(self,model,loss_list,**kargs):
+    def save_best_ckpt(self,model,accu_pool,epoch,**kargs):
         if not self.global_do_log:return False
         model = model.module if hasattr(model,'module') else model
-        return self.model_saver.save_best_model(model,loss_list,**kargs)
+        return self.model_saver.save_best_model(model,accu_pool,epoch,**kargs)
 
-    def save_latest_ckpt(self,model,**kargs):
+    def save_latest_ckpt(self,model,epoch,**kargs):
         if not self.global_do_log:return
         if model is None:raise
         model = model.module if hasattr(model,'module') else model
-        self.model_saver.save_latest_model(model,**kargs)
+        self.model_saver.save_latest_model(model,epoch,**kargs)
 
     def runtime_log_table(self,table_string):
         if not self.global_do_log:return

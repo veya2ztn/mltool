@@ -1,6 +1,8 @@
 import cv2
 from PIL import Image, ImageOps, ImageStat, ImageDraw
 from scipy.stats import gaussian_kde
+import matplotlib
+matplotlib.use('Agg')
 try:
     import matplotlib.pyplot as plt
 except:

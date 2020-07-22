@@ -290,7 +290,7 @@ class LossStores:
         window = self.buffer[-max_length:]
         if mode == "no_min_more":
             #if num > max(window)*0.99:return True
-            if num > max(window)-0.00001:return True
+            if num > max(window)-0.0001:return True
         anti_over_fit_min = self.buffer[-anti_over_fit_length:]
         if min(anti_over_fit_min)>min(self.buffer):return True
         return False
@@ -524,8 +524,9 @@ class ModelSaver:
         self._save_status(status_now)
     def _reload(self):
         status_now = self._get_status()
-        for epoch,pool in status_now['routine']:
+        for epoch,pool in status_now['routine'].items():
             for accu_type in self.accu_list:
+                accu = pool[accu_type]
                 self.loss_stores[accu_type].update(accu,epoch)
     def _get_status(self):
         # the _status record in a json file named "saver_info.json"
@@ -555,8 +556,7 @@ class ModelSaver:
                 if temp_key in self.temp_info:
                     last_best_path = self.temp_info[temp_key]
                     if os.path.exists(last_best_path):os.remove(last_best_path)
-                else:
-                    self.temp_info[temp_key] = path_at_save
+                self.temp_info[temp_key] = path_at_save
             earlystopQ = self.loss_stores[accu_type].earlystop(accu,max_length=self.early_stop_window,mode=self.early_stop_mode)
             total_estop+=earlystopQ
             self.loss_stores[accu_type].update(accu,epoch)

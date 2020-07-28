@@ -12,7 +12,7 @@ class LoggingSystem:
         logsys.terminaler.
         logsys.webtracker.
     '''
-    def __init__(self,global_do_log,ckpt_root):
+    def __init__(self,global_do_log,ckpt_root,gpu=0):
         self.global_do_log = global_do_log
         self.diable_logbar = not global_do_log
         self.ckpt_root     = ckpt_root
@@ -21,6 +21,7 @@ class LoggingSystem:
         self.Q_recorder_type = 'tensorboard'
         self.Q_batch_loss_record = False
         self.master_bar = None
+        self.gpu_now    = gpu
 
     def train(self):
         if not self.global_do_log:return
@@ -40,7 +41,7 @@ class LoggingSystem:
             self.recorder.step([value])
             self.recorder.auto_save_loss()
 
-    
+
 
     def add_figure(self,name,figure,epoch):
         if not self.global_do_log:return

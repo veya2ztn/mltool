@@ -37,3 +37,21 @@ class BiLSTM(nn.Module):
         attn_output, attention = self.attention_net(output, final_hidden_state)
         #return self.out(attn_output), attention # model : [batch_size, self.num_classes], attention : [batch_size, n_step]
         return self.out(attn_output) # model : [batch_size, self.num_classes], attention : [batch_size, n_step]
+
+class BiLSTM2(nn.Module):
+
+    def __init__(self,embedding_dim,n_hidden,num_classes):
+        super().__init__()
+        self.embedding_dim= embedding_dim
+        self.n_hidden     = n_hidden
+        self.num_classes  = num_classes
+        self.lstm         = nn.LSTM(self.embedding_dim, self.n_hidden, bidirectional=True)
+        self.out          = nn.Linear(self.n_hidden * 2, self.num_classes)
+
+    def forward(self, X):
+        if len(X.shape)==2:X=X.unsqueeze(1)
+        input = X.permute(1, 0, 2) # input : [len_seq, batch_size, self.embedding_dim]
+        output, (final_hidden_state, final_cell_state) = self.lstm(input)
+        y = self.out(output[-1])
+        log_probs = F.log_softmax(y,dim=-1)
+        return log_probs

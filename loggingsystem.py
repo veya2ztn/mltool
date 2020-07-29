@@ -22,7 +22,6 @@ class LoggingSystem:
         self.Q_batch_loss_record = False
         self.master_bar = None
         self.gpu_now    = gpu
-
     def train(self):
         if not self.global_do_log:return
         self.progress_bar = self.train_bar
@@ -107,12 +106,14 @@ class LoggingSystem:
             self.global_step+=1
         else:
             return
-
-    def close(self):
+    def save_scalars(self):
         if not self.global_do_log:return
         if self.Q_recorder_type == 'tensorboard':
             self.recorder.export_scalars_to_json(os.path.join(self.ckpt_root,"all_scalars.json"))
-            self.recorder.close()
-        self.master_bar.close()
-        self.train_bar.close()
-        self.valid_bar.close()
+
+    def close(self):
+        if not self.global_do_log:return
+        if self.recorder is not None:  self.recorder.close()
+        if self.master_bar is not None:self.master_bar.close()
+        if self.train_bar is not None: self.train_bar.close()
+        if self.valid_bar is not None: self.valid_bar.close()

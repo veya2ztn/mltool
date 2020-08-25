@@ -284,13 +284,13 @@ class LossStores:
         sort=sorted(self.store.items(), key=lambda d: d[1])
         return sort[num-1][1]
 
-    def earlystop(self,num,max_length=20,anti_over_fit_length=30,mode="no_min_more"):
+    def earlystop(self,num,max_length=30,anti_over_fit_length=50,mode="no_min_more"):
         self.buffer = list(self.store.values())
         if len(self.buffer)<=max_length:return False
         window = self.buffer[-max_length:]
         if mode == "no_min_more":
             #if num > max(window)*0.99:return True
-            if num > max(window)-0.0001:return True
+            if num > max(window)-0.00001:return True
         anti_over_fit_min = self.buffer[-anti_over_fit_length:]
         if min(anti_over_fit_min)>min(self.buffer):return True
         return False
@@ -547,15 +547,15 @@ class ModelSaver:
             accu = accu_pool[accu_type]
             best = accu_pool['best_'+accu_type]
             if accu <= best:
-                name_at_save = 'best_{}_{:.4f}'.format(accu_type,accu)
-                path_at_save = os.path.join(self.best_path,name_at_save)
-                model.save_to(path_at_save)
-                status_now['best_'+accu_type]={'epoch':epoch,'score':accu}
                 ### remove last save path
                 temp_key =  f'last_best_{accu_type}_path'
                 if temp_key in self.temp_info:
                     last_best_path = self.temp_info[temp_key]
                     if os.path.exists(last_best_path):os.remove(last_best_path)
+                name_at_save = 'epoch{}.best_{}_{:.4f}'.format(epoch,accu_type,accu)
+                path_at_save = os.path.join(self.best_path,name_at_save)
+                model.save_to(path_at_save)
+                status_now['best_'+accu_type]={'epoch':epoch,'score':accu}
                 self.temp_info[temp_key] = path_at_save
             earlystopQ = self.loss_stores[accu_type].earlystop(accu,max_length=self.early_stop_window,mode=self.early_stop_mode)
             total_estop+=earlystopQ

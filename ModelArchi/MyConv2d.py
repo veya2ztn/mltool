@@ -7,7 +7,7 @@ import numpy as np
 class Bottleneck(nn.Module):
     """ Adapted from torchvision.models.resnet """
 
-    def __init__(self, in_channels, output_channels, stride,mid_channels=None,upsample=None, norm_layer=nn.BatchNorm2d):
+    def __init__(self, in_channels, output_channels, stride,mid_channels=None,upsample=None, norm_layer=nn.BatchNorm2d,relu=nn.ReLU(inplace=True)):
         super().__init__()
         if mid_channels is None:mid_channels=in_channels
         optpad = stride-1
@@ -17,7 +17,7 @@ class Bottleneck(nn.Module):
         self.bn2      = norm_layer(mid_channels)
         self.conv3    = nn.Conv2d(mid_channels, output_channels, kernel_size=1, bias=False)
         self.bn3      = norm_layer(output_channels)
-        self.relu     = nn.ReLU(inplace=True)
+        self.relu     = relu
         #self.relu  = nn.LeakyReLU(negative_slope=0.6, inplace=True)
         self.stride   = stride
         self.upsample = upsample
@@ -68,6 +68,8 @@ class BottleneckV2(Bottleneck):
         super().__init__(in_channels, output_channels, stride,mid_channels=mid_channels)
 
 
+
+
 class ResNetConfig(nn.Module):
     def __init__(self, block,layerconfig):
         super().__init__()
@@ -101,6 +103,37 @@ class ResNetConfig(nn.Module):
         x = self.finalpool(x)
 
         return x
+
+class SimpleResNetConfig(nn.Module):
+    def __init__(self, block,layerconfig,relu=nn.ReLU(inplace=True)):
+        super().__init__()
+        block=block
+        channel_start,_,_ = layerconfig[0]
+        self.conv1   = nn.Conv2d(layerconfig[0][0], layerconfig[1][0], kernel_size=7,padding=3)
+        self.bn1     = nn.BatchNorm2d(layerconfig[1][0])
+        self.relu    = relu
+        self.inplanes= layerconfig[1][0]
+        self.layers  = nn.ModuleList()
+        for i in range(1,len(layerconfig)):
+            channel,layers,stride = layerconfig[i]
+            self.layers.append(self._make_layer(block,channel,  layers, stride=stride))
+
+    def _make_layer(self, block, out_channels, blocks, stride=1):
+        layers = []
+        layers.append(block(self.inplanes, out_channels, stride))
+        self.inplanes = out_channels
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, out_channels, 1))
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        for layer in self.layers:x = layer(x)
+
+        return x
+
 
 
 class FPNUpSample(nn.Module):

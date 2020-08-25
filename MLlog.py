@@ -285,14 +285,16 @@ class LossStores:
         return sort[num-1][1]
 
     def earlystop(self,num,max_length=30,anti_over_fit_length=50,mode="no_min_more"):
+        anti_over_fit_length=max(max_length,anti_over_fit_length)
         self.buffer = list(self.store.values())
+
         if len(self.buffer)<=max_length:return False
         window = self.buffer[-max_length:]
         if mode == "no_min_more":
-            #if num > max(window)*0.99:return True
             if num > max(window)-0.00001:return True
         anti_over_fit_min = self.buffer[-anti_over_fit_length:]
         if min(anti_over_fit_min)>min(self.buffer):return True
+
         return False
 
 import time

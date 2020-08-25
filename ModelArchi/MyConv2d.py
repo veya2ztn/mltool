@@ -4,6 +4,15 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
+def relu2leackrelu(module,_slope=0.2):
+    module_output = module
+    if isinstance(module, torch.nn.ReLU):
+        module_output = torch.nn.LeakyReLU(inplace=True,negative_slope=_slope)
+    for name, child in module.named_children():
+        module_output.add_module(name, relu2leackrelu(child,_slope))
+    del module
+    return module_output
+
 class Bottleneck(nn.Module):
     """ Adapted from torchvision.models.resnet """
 
@@ -55,17 +64,17 @@ class Bottleneck(nn.Module):
         return out
 
 class BottleneckV0(Bottleneck):
-    def __init__(self, in_channels, output_channels, stride):
+    def __init__(self, in_channels, output_channels, stride,**kargs):
         mid_channels  = in_channels
-        super().__init__(in_channels, output_channels, stride,mid_channels=mid_channels)
+        super().__init__(in_channels, output_channels, stride,mid_channels=mid_channels,**kargs)
 class BottleneckV1(Bottleneck):
-    def __init__(self, in_channels, output_channels, stride):
+    def __init__(self, in_channels, output_channels, stride,**kargs):
         mid_channels  = output_channels
-        super().__init__(in_channels, output_channels, stride,mid_channels=mid_channels)
+        super().__init__(in_channels, output_channels, stride,mid_channels=mid_channels,**kargs)
 class BottleneckV2(Bottleneck):
-    def __init__(self, in_channels, output_channels, stride):
+    def __init__(self, in_channels, output_channels, stride,**kargs):
         mid_channels  = (in_channels+output_channels)//2
-        super().__init__(in_channels, output_channels, stride,mid_channels=mid_channels)
+        super().__init__(in_channels, output_channels, stride,mid_channels=mid_channels,**kargs)
 
 
 
@@ -120,10 +129,10 @@ class SimpleResNetConfig(nn.Module):
 
     def _make_layer(self, block, out_channels, blocks, stride=1):
         layers = []
-        layers.append(block(self.inplanes, out_channels, stride))
+        layers.append(block(self.inplanes, out_channels, stride,relu=self.relu))
         self.inplanes = out_channels
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, out_channels, 1))
+            layers.append(block(self.inplanes, out_channels, 1,relu=self.relu))
         return nn.Sequential(*layers)
 
     def forward(self, x):

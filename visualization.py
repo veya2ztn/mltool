@@ -70,17 +70,3 @@ def smoothheatdensity(x,y):
     Z = kde.evaluate(np.vstack([Xgrid.ravel(), Ygrid.ravel()]))
     # Plot the result as an image
     plt.imshow(Z.reshape(Xgrid.shape),origin='lower', aspect='auto',extent=[min(x), max(x), min(y), max(y)], cmap='Blues')
-
-def errorbarplot(data):
-    assert len(data.shape)==2
-    y_axis = data.mean(0)
-    x_axis = np.arange(len(y_axis))
-    y_err  = data.var(0)
-
-    plt.errorbar(x_axis, y_axis, yerr = y_err)
-def minmaxplot(data):
-    assert len(data.shape)==2
-    y_axis = data.mean(0)
-    x_axis = np.arange(len(y_axis))
-    plt.plot(x_axis,data.max(0),'r')
-    plt.plot(x_axis,data.min(0),'b')

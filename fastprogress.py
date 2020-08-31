@@ -117,13 +117,13 @@ class ProgressBar():
         self.now+=val
         return True
 
-    def restart(self,total=None):
-
+    def restart(self,gen):
+        total=self.total
         display=self.display
         leave=self.leave
         parent=self.parent
         auto_update=self.auto_update
-        self.__init__(gen=None, total=total, display=display, leave=leave, parent=parent, auto_update=auto_update)
+        self.__init__(gen, total=total, display=display, leave=leave, parent=parent, auto_update=auto_update)
 class MasterBar():
     def __init__(self, gen, cls, total=None):
         self.first_bar = cls(gen, total=total, display=False)
@@ -208,8 +208,6 @@ class NBProgressBar(ProgressBar):
         if self.display: self.out.update(HTML(self.progress))
         elif self.parent is not None: self.parent.show()
 
-
-
 class NBMasterBar(MasterBar):
     names = ['train', 'valid']
     def __init__(self, gen=None, total=None, hide_graph=False, order=None, clean_on_interrupt=False, total_time=False,**kargs):
@@ -221,10 +219,10 @@ class NBMasterBar(MasterBar):
         self.inner_dict = {'pb1':self.first_bar.progress, 'text':self.text}
         self.hide_graph,self.order = hide_graph,order
         self.multiply_graph_set=False
-        self.out = display(HTML(self.html_code), display_id=True)
+
     def on_iter_begin(self):
         super().on_iter_begin()
-        #self.out = display(HTML(self.html_code), display_id=True)
+        self.out = display(HTML(self.html_code), display_id=True)
 
     def on_interrupt(self):
         if self.clean_on_interrupt: self.out.update(HTML(''))
@@ -288,9 +286,7 @@ class NBMasterBar(MasterBar):
         self.multiply_graph_set = True
         self.graph_fig,  graph_axes = plt.subplots(nrows=nrow, ncols=ncol, figsize=figsize)
         self.graph_axes= graph_axes.flatten()
-        if not hasattr(self, 'graph_out'):
-            self.graph_out = display(self.graph_axes[0].figure, display_id=True)
-            self.imgs_out=self.graph_out
+
     def update_graph_multiply(self, graphs, x_bounds=None, y_bounds=None, figsize=(6,4)):
         if self.hide_graph: return
         if x_bounds is None: x_bounds = [None]*len(graphs)
@@ -298,6 +294,9 @@ class NBMasterBar(MasterBar):
         if not self.multiply_graph_set:
             print('please set mltiply graph first')
             raise NotImplementedError
+        if not hasattr(self, 'graph_out'):
+            self.graph_out = display(self.graph_axes[0].figure, display_id=True)
+            self.imgs_out=self.graph_out
         if len(self.names) < len(graphs): self.names += [['total']]
         for i,graph in enumerate(graphs):
         #for graph,name,graph_ax in zip(graphs,self.names,self.graph_axes):
@@ -312,8 +311,6 @@ class NBMasterBar(MasterBar):
             if x_bound is not None: graph_ax.set_xlim(*x_bound)
             if y_bound is not None: graph_ax.set_ylim(*y_bound)
         self.graph_out.update(self.graph_axes[0].figure)
-
-
 
 magic_char = "\033[F"
 import sys

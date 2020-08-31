@@ -7,7 +7,7 @@ from torchvision import utils
 plt.switch_backend('agg')
 import os
 from .spectral_normalization import SpectralNorm
-    
+
 class Generator(torch.nn.Module):
     def __init__(self, channels):
         super().__init__()
@@ -329,3 +329,11 @@ class WGAN_CP(object):
         grid = utils.make_grid(images, nrow=number_int )
         utils.save_image(grid, 'interpolated_images/interpolated_{}.png'.format(str(number).zfill(3)))
         print("Saved interpolated images.")
+    def save_to(self,path):
+        checkpoint={}
+        checkpoint['D_state_dict']    = self.D.state_dict()
+        checkpoint['D_optimizer']     = self.d_optimizer.state_dict()
+        checkpoint['G_state_dict']    = self.G.state_dict()
+        checkpoint['G_optimizer']     = self.g_optimizer.state_dict()
+        checkpoint['C_optimizer']     = self.c_optimizer.state_dict()
+        torch.save(checkpoint,path)

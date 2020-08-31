@@ -285,16 +285,14 @@ class LossStores:
         return sort[num-1][1]
 
     def earlystop(self,num,max_length=30,anti_over_fit_length=50,mode="no_min_more"):
-        anti_over_fit_length=max(max_length,anti_over_fit_length)
         self.buffer = list(self.store.values())
-
         if len(self.buffer)<=max_length:return False
         window = self.buffer[-max_length:]
         if mode == "no_min_more":
+            #if num > max(window)*0.99:return True
             if num > max(window)-0.00001:return True
         anti_over_fit_min = self.buffer[-anti_over_fit_length:]
         if min(anti_over_fit_min)>min(self.buffer):return True
-
         return False
 
 import time
@@ -542,13 +540,13 @@ class ModelSaver:
         name_at_save = "latest_weight_now"
         path_at_save = os.path.join(self.routine_path,name_at_save)
         model.save_to(path_at_save)
-    def save_best_model(self,model,accu_pool,epoch,doearlystop=True):
+    def save_best_model(self,model,accu_pool,epoch,doearlystop=True,do_save=True):
         status_now = self._get_status()
         total_estop= 0
         for accu_type in self.accu_list:
             accu = accu_pool[accu_type]
             best = accu_pool['best_'+accu_type]
-            if accu <= best:
+            if accu <= best and do_save:
                 ### remove last save path
                 temp_key =  f'last_best_{accu_type}_path'
                 if temp_key in self.temp_info:

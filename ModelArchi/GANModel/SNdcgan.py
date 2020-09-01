@@ -331,10 +331,14 @@ class DCGAN_MODEL(object):
         print("Saved interpolated images to interpolated_images/interpolated_{}.".format(str(number).zfill(3)))
 
     def save_to(self,path):
+        checkpoint = self.all_state_dict()
+        torch.save(checkpoint,path)
+
+    def all_state_dict(self):
         checkpoint={}
         checkpoint['D_state_dict']    = self.D.state_dict()
         checkpoint['D_optimizer']     = self.d_optimizer.state_dict()
         checkpoint['G_state_dict']    = self.G.state_dict()
         checkpoint['G_optimizer']     = self.g_optimizer.state_dict()
         checkpoint['C_optimizer']     = self.c_optimizer.state_dict()
-        torch.save(checkpoint,path)
+        return checkpoint

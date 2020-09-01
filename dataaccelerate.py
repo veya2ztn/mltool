@@ -2,7 +2,7 @@
 
 # 新建DataLoaderX类
 from torch.utils.data import DataLoader
-from prefetch_generator import BackgroundGenerator
+
 import torch
 
 def sendall2gpu(listinlist,device):
@@ -13,13 +13,13 @@ def sendall2gpu(listinlist,device):
         return out
     else:
         return listinlist.float().to(device=device, non_blocking=True)
-
-class DataLoaderX(DataLoader):
-
-    def __iter__(self):
-        return BackgroundGenerator(super().__iter__())
-
-
+try:
+    from prefetch_generator import BackgroundGenerator
+    class DataLoaderX(DataLoader):
+        def __iter__(self):
+            return BackgroundGenerator(super().__iter__())
+except:
+    DataLoaderX = DataLoader
 class DataSimfetcher():
     def __init__(self, loader, device='auto'):
         if device == 'auto':
@@ -35,9 +35,6 @@ class DataSimfetcher():
         except StopIteration:
             self.batch = None
         return self.batch
-
-
-
 class DataPrefetcher():
     def __init__(self, loader, device='auto'):
         if device == 'auto':self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

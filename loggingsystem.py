@@ -24,6 +24,7 @@ class LoggingSystem:
         self.master_bar = None
         self.gpu_now    = gpu
         self.hyperaram_file = os.path.join(self.ckpt_root,'hyperaram.json')
+        if not os.path.exists(self.ckpt_root):os.makedirs(self.ckpt_root)
     def train(self):
 
         if not self.global_do_log:return

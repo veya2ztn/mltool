@@ -513,6 +513,8 @@ class ModelSaver:
         self.loss_stores  = {}
         for accu_type in accu_list:self.loss_stores[accu_type]=LossStores()
         self.temp_info    = {}
+        self.model_weight = {}
+        self.last_save_epoch={}
         if not os.path.exists(self.status_file):
             self._initial()
         else:
@@ -540,23 +542,30 @@ class ModelSaver:
         name_at_save = "latest_weight_now"
         path_at_save = os.path.join(self.routine_path,name_at_save)
         model.save_to(path_at_save)
-    def save_best_model(self,model,accu_pool,epoch,doearlystop=True,do_save=True):
+    def save_best_model(self,model,accu_pool,epoch,doearlystop=True,save_inteval=10,**kargs):
         status_now = self._get_status()
         total_estop= 0
+
         for accu_type in self.accu_list:
             accu = accu_pool[accu_type]
             best = accu_pool['best_'+accu_type]
-            if accu <= best and do_save:
-                ### remove last save path
-                temp_key =  f'last_best_{accu_type}_path'
-                if temp_key in self.temp_info:
-                    last_best_path = self.temp_info[temp_key]
-                    if os.path.exists(last_best_path):os.remove(last_best_path)
-                name_at_save = 'epoch{}.best_{}_{:.4f}'.format(epoch,accu_type,accu)
-                path_at_save = os.path.join(self.best_path,name_at_save)
-                model.save_to(path_at_save)
-                status_now['best_'+accu_type]={'epoch':epoch,'score':accu}
-                self.temp_info[temp_key] = path_at_save
+            if accu <= best:
+                self.model_weight[accu_type] = model.all_state_dict()
+                self.last_save_epoch[accu_type]   = [epoch,False]
+            else:
+                last_epoch,saveQ=self.last_save_epoch[accu_type]
+                if (epoch - last_epoch > save_inteval) and (not saveQ):
+                    self.last_save_epoch[accu_type] = [last_epoch,True]
+                    temp_key =  f'last_best_{accu_type}_path'
+                    if temp_key in self.temp_info:
+                        last_best_path = self.temp_info[temp_key]
+                        if os.path.exists(last_best_path):os.remove(last_best_path)
+                    name_at_save = 'epoch{}.best_{}_{:.4f}'.format(epoch,accu_type,accu)
+                    path_at_save = os.path.join(self.best_path,name_at_save)
+                    torch.save(self.model_weight[accu_type],path_at_save)
+                    status_now['best_'+accu_type]={'epoch':epoch,'score':accu}
+                    self.temp_info[temp_key] = path_at_save
+
             earlystopQ = self.loss_stores[accu_type].earlystop(accu,max_length=self.early_stop_window,mode=self.early_stop_mode)
             total_estop+=earlystopQ
             self.loss_stores[accu_type].update(accu,epoch)

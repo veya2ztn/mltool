@@ -291,6 +291,7 @@ class LossStores:
         if mode == "no_min_more":
             #if num > max(window)*0.99:return True
             if num > max(window)-0.00001:return True
+        if min(window)>num-0.00001:return True #for real bad case
         anti_over_fit_min = self.buffer[-anti_over_fit_length:]
         if min(anti_over_fit_min)>min(self.buffer):return True
         return False

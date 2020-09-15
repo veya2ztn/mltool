@@ -17,11 +17,11 @@ def conv3x3(in_planes, out_planes, stride=1):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, downsample=None,relu = nn.ReLU(inplace=True)):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = nc.BatchNorm2d(planes)
-        self.relu = nc.ReLU(inplace=True)
+        self.relu = relu
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = nc.BatchNorm2d(planes)
         self.downsample = downsample
@@ -49,7 +49,7 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, downsample=None,relu = nn.ReLU(inplace=True)):
         super(Bottleneck, self).__init__()
         self.conv1 = nc.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1   = nc.BatchNorm2d(planes)
@@ -58,7 +58,7 @@ class Bottleneck(nn.Module):
         self.bn2   = nc.BatchNorm2d(planes)
         self.conv3 = nc.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
         self.bn3   = nc.BatchNorm2d(planes * 4)
-        self.relu  = nc.ReLU(inplace=True)
+        self.relu  = relu
         self.downsample = downsample
         self.stride = stride
 
@@ -87,20 +87,20 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, num_classes=1000):
+    def __init__(self, block, layers, num_classes=1000,relu = nn.ReLU(inplace=True)):
         self.inplanes = 64
         super(ResNet, self).__init__()
         self.conv1   = nc.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1     = nc.BatchNorm2d(64)
-        self.relu    = nc.ReLU(inplace=True)
+        self.relu    = relu
         self.maxpool = nc.AvgPool2d(kernel_size=3, stride=2)
         #self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1  = self._make_layer(block, 64, layers[0])
         self.layer2  = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3  = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4  = self._make_layer(block, 512, layers[3], stride=2)
-        self.avgpool = nc.AvgPool2d(7, stride=1)
+        self.avgpool = nc.AdaptiveAvgPool1d(7)
         self.fc = nc.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -129,7 +129,7 @@ class ResNet(nn.Module):
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
+        layers.append(block(self.inplanes, planes, stride, downsample,relu=self.relu))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes))

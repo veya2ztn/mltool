@@ -8,15 +8,15 @@ from torch.autograd import Variable
 import numpy as np
 
 class MLPlayer(torch.nn.Module):
-    def __init__(self,channel_list):
+    def __init__(self,channel_list,activater=nn.ReLU):
         super().__init__()
         in_out_list = [[channel_list[i],channel_list[i+1]]for i in range(len(channel_list)-1)]
         layer = []
         for _in,_out in in_out_list:
             layer.append(torch.nn.Linear(_in,_out))
-            layer.append(torch.nn.ReLU(inplace=True))
+            layer.append(activater(inplace=True))
         self.layers = torch.nn.Sequential(*layer)
-        
+
     def forward(self,x):
         x = self.layers(x)
         return x
@@ -147,7 +147,7 @@ class OneBottleneck(nn.Module):
 
         planes=output_channels
         self.stride = stride
-        
+
         self.ConvBlock1= nn.Sequential(
                         nn.Conv2d(in_channels, planes, kernel_size=1, bias=bias, dilation=dilation),
                         norm_layer(planes),
@@ -171,12 +171,12 @@ class OneBottleneck(nn.Module):
     def forward(self, x):
         res = 0
         if self.downsample is not None:
-            res = self.downsample(x)      
+            res = self.downsample(x)
         x = self.ConvBlock1(x)
         x += res
         x = self.relu(x)
 
-        return x    
+        return x
 
 class TwoBottleneck(nn.Module):
     """
@@ -197,7 +197,7 @@ class TwoBottleneck(nn.Module):
             planes=mid_channel
         optpad = stride-1
         self.stride = stride
-        
+
         self.ConvBlock1= nn.Sequential(
                         nn.Conv2d(in_channels, planes, kernel_size=1, dilation=dilation,bias=bias),
                         norm_layer(planes),
@@ -227,7 +227,7 @@ class TwoBottleneck(nn.Module):
         res = 0
         if self.downsample is not None:
             res = self.downsample(x)
-            
+
         x = self.ConvBlock1(x)
         x = self.ConvBlock2(x)
 
@@ -235,7 +235,7 @@ class TwoBottleneck(nn.Module):
         x = self.relu(x)
 
         return x
-    
+
 class TriBottleneck(nn.Module):
     """
     Adapted from torchvision.models.resnet
@@ -256,7 +256,7 @@ class TriBottleneck(nn.Module):
             planes=mid_channel
         optpad = stride-1
         self.stride = stride
-        
+
         self.ConvBlock1= nn.Sequential(
                         nn.Conv2d(in_channels, planes, kernel_size=1, bias=bias, dilation=dilation),
                         norm_layer(planes),
@@ -273,7 +273,7 @@ class TriBottleneck(nn.Module):
                         norm_layer(output_channels),
                         #nn.ReLU(inplace=True),
                         )
-        
+
         self.relu  = nn.ReLU(inplace=True)
         self.downsample =None
 
@@ -292,11 +292,11 @@ class TriBottleneck(nn.Module):
         res = 0
         if self.downsample is not None:
             res = self.downsample(x)
-            
+
         x = self.ConvBlock1(x)
         x = self.ConvBlock2(x)
         x = self.ConvBlock3(x)
-        
+
         x += res
         x = self.relu(x)
 

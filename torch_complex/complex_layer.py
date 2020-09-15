@@ -137,46 +137,76 @@ class ComplexBatchNorm2d(torch.nn.BatchNorm3d):
     pass
 class ComplexBatchNorm3d(torch.nn.BatchNorm3d):pass
 
+class ComplexAvgPool1d(torch.nn.AvgPool2d):
+    def __init__(self,kernel_size,**kargs):
+        kernel_size = _single(kernel_size)
+        kernel_size = tuple(list(kernel_size)+[1])
+        super().__init__(kernel_size,**kargs)
+class ComplexMaxPool1d(torch.nn.MaxPool2d):
+    def __init__(self,kernel_size,**kargs):
+        kernel_size = _single(kernel_size)
+        kernel_size = tuple(list(kernel_size)+[1])
+        super().__init__(kernel_size,**kargs)
+class ComplexAdaptiveAvgPool1d(torch.nn.AdaptiveAvgPool2d):
+    def __init__(self,kernel_size,**kargs):
+        kernel_size = _single(kernel_size)
+        kernel_size = tuple(list(kernel_size)+[2])
+        super().__init__(kernel_size,**kargs)
 
+class ComplexAvgPool2d(torch.nn.AvgPool3d):
+    def __init__(self,kernel_size,**kargs):
+        kernel_size = _pair(kernel_size)
+        kernel_size = tuple(list(kernel_size)+[1])
+        super().__init__(kernel_size,**kargs)
+class ComplexMaxPool2d(torch.nn.MaxPool3d):
+    def __init__(self,kernel_size,**kargs):
+        kernel_size = _pair(kernel_size)
+        kernel_size = tuple(list(kernel_size)+[1])
+        super().__init__(kernel_size,**kargs)
+class ComplexAdaptiveAvgPool2d(torch.nn.AdaptiveAvgPool3d):
+    def __init__(self,kernel_size,**kargs):
+        kernel_size = _pair(kernel_size)
+        kernel_size = tuple(list(kernel_size)+[2])
+        super().__init__(kernel_size,**kargs)
 
-class _ComplexAvgPoolNd(torch.nn.modules.pooling._AvgPoolNd):
-    def __init__(self, kernel_size, stride=None, padding=0, ceil_mode=False,
-                 count_include_pad=True):
-        super(_ComplexAvgPoolNd, self).__init__()
-        self.kernel_size = kernel_size
-        self.stride = stride or kernel_size
-        self.padding = padding
-        self.ceil_mode = ceil_mode
-        self.count_include_pad = count_include_pad
-
-    def forward(self,x):
-        real = x[...,0]
-        imag = x[...,1]
-        real = self.pool(real, self.kernel_size, self.stride, self.padding, self.ceil_mode,
-                            self.count_include_pad)
-        imag = self.pool(imag, self.kernel_size, self.stride, self.padding, self.ceil_mode,
-                            self.count_include_pad)
-        x    = torch.stack([real,imag],-1)
-        x.__class__ = ComplexTensor
-        return x
-class ComplexAvgPool1d(_ComplexAvgPoolNd):pool = F.avg_pool1d
-class ComplexAvgPool2d(_ComplexAvgPoolNd):pool = F.avg_pool2d
-class ComplexAvgPool3d(_ComplexAvgPoolNd):pool = F.avg_pool3d
-
-class ComplexMaxPool1d(torch.nn.MaxPool1d):pass
-class ComplexMaxPool2d(torch.nn.MaxPool2d):
-    '''
-    basicly, there is no Max Pool for complex number system
-    '''
-    def forward(self,x):
-        real = x[...,0]
-        imag = x[...,1]
-        real = F.max_pool2d(real, self.kernel_size, self.stride, self.padding, self.dilation, self.ceil_mode,self.return_indices)
-        imag = F.max_pool2d(imag, self.kernel_size, self.stride, self.padding, self.dilation, self.ceil_mode,self.return_indices)
-        x    = torch.stack([real,imag],-1)
-        x.__class__ = ComplexTensor
-        return x
-class ComplexMaxPool3d(torch.nn.MaxPool3d):pass
+# class _ComplexAvgPoolNd(torch.nn.modules.pooling._AvgPoolNd):
+#     def __init__(self, kernel_size, stride=None, padding=0, ceil_mode=False,
+#                  count_include_pad=True):
+#         super(_ComplexAvgPoolNd, self).__init__()
+#         self.kernel_size = kernel_size
+#         self.stride = stride or kernel_size
+#         self.padding = padding
+#         self.ceil_mode = ceil_mode
+#         self.count_include_pad = count_include_pad
+#
+#     def forward(self,x):
+#         real = x[...,0]
+#         imag = x[...,1]
+#         real = self.pool(real, self.kernel_size, self.stride, self.padding, self.ceil_mode,
+#                             self.count_include_pad)
+#         imag = self.pool(imag, self.kernel_size, self.stride, self.padding, self.ceil_mode,
+#                             self.count_include_pad)
+#         x    = torch.stack([real,imag],-1)
+#         x.__class__ = ComplexTensor
+#         return x
+# class ComplexAvgPool1d(_ComplexAvgPoolNd):pool = F.avg_pool1d
+# class ComplexAvgPool2d(_ComplexAvgPoolNd):pool = F.avg_pool2d
+# class ComplexAvgPool3d(_ComplexAvgPoolNd):pool = F.avg_pool3d
+#
+# class ComplexMaxPool1d(torch.nn.MaxPool1d):pass
+# class ComplexMaxPool2d(torch.nn.MaxPool2d):
+#     '''
+#     basicly, there is no Max Pool for complex number system
+#     '''
+#     def forward(self,x):
+#         real = x[...,0]
+#         imag = x[...,1]
+#         real = F.max_pool2d(real, self.kernel_size, self.stride, self.padding, self.dilation, self.ceil_mode,self.return_indices)
+#         imag = F.max_pool2d(imag, self.kernel_size, self.stride, self.padding, self.dilation, self.ceil_mode,self.return_indices)
+#         x    = torch.stack([real,imag],-1)
+#         x.__class__ = ComplexTensor
+#         return x
+# class ComplexMaxPool3d(torch.nn.MaxPool3d):pass
 
 class ComplexMLPlayer(torch.nn.Module):
     def __init__(self,channel_list):
@@ -210,8 +240,9 @@ ReImNorm3d= ComplexReImNorm3d
 
 AvgPool1d= ComplexAvgPool1d
 AvgPool2d= ComplexAvgPool2d
-AvgPool3d= ComplexAvgPool3d
 
 MaxPool1d= ComplexMaxPool1d
 MaxPool2d= ComplexMaxPool2d
-MaxPool3d= ComplexMaxPool3d
+
+AdaptiveAvgPool1d= ComplexAdaptiveAvgPool1d
+AdaptiveAvgPool2d= ComplexAdaptiveAvgPool2d

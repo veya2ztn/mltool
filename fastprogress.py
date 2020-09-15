@@ -286,7 +286,9 @@ class NBMasterBar(MasterBar):
         self.multiply_graph_set = True
         self.graph_fig,  graph_axes = plt.subplots(nrows=nrow, ncols=ncol, figsize=figsize)
         self.graph_axes= graph_axes.flatten()
-
+        if not hasattr(self, 'graph_out'):
+            self.graph_out = display(self.graph_axes[0].figure, display_id=True)
+            self.imgs_out=self.graph_out
     def update_graph_multiply(self, graphs, x_bounds=None, y_bounds=None, figsize=(6,4)):
         if self.hide_graph: return
         if x_bounds is None: x_bounds = [None]*len(graphs)

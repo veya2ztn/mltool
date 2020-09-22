@@ -4,7 +4,39 @@ import torch
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import numpy as np
-from torch.nn.modules.utils import _pair,_single
+from torch.nn.modules.utils import _pair,_single,_triple
+
+def _force_triple(size,end=None):
+    if len(size)==1 or len(size)==3:return _triple(size)
+    else:
+        assert size[0]==size[1]
+        if end is None:
+            return _triple(size[0])
+        else:
+            return tuple(list(size)+[end])
+def Realization(module):
+    module_output = module
+    if isinstance(module, ComplexConv2d):
+        assert (module.bias is None) or (module.bias == False)
+        module_output = RealizedConv2d(in_channels =module.in_channels ,
+                                        out_channels=module.out_channels,
+                                        kernel_size =_force_triple(module.kernel_size ,2),
+                                        stride      =_force_triple(module.stride      ,1),
+                                        padding     =_force_triple(module.padding     ,1),
+                                        dilation    =_force_triple(module.dilation    ,1),
+                                        bias        =False)
+    elif isinstance(module, ComplexLinear):
+        module_output = GroupedLinear(in_features =module.in_features ,
+                                       out_features=module.out_features,
+                                       bias        =False if module.bias is None else True        ,)
+        # module_output = RealizedLinear(in_features =module.in_features*2 ,
+        #                                out_features=module.out_features*2,
+        #                                bias        =False if module.bias is None else True        ,)
+    for name, child in module.named_children():
+        module_output.add_module(name, Realization(child))
+    del module
+    return module_output
+
 class ComplexLinear(torch.nn.Linear):
     '''
     Applies a linear transformation to the incoming data:
@@ -32,7 +64,24 @@ class ComplexLinear(torch.nn.Linear):
         x = C.complex_mm(x,self.weight) +self.bias
         x.__class__ = ComplexTensor
         return x
+class RealizedLinear(torch.nn.Linear):
+    '''
+    input size : (batch, size_source,2)
+    do flatten ->(batch, 2*size_source)
+    do liner   ->(batch, 2*size_target)
+    do split   ->(batch, size_target,2)
+    '''
+    def forward(self,x):
+        assert x.shape[-1]==2
+        return F.linear(x.flatten(start_dim=-2), self.weight, self.bias).reshape(tuple(list(x.shape)[:-2]+[-1,2]))
+class GroupedLinear(ComplexLinear):
 
+    def forward(self,x):
+        assert x.shape[-1]==2
+        x1 = F.linear(x[...,0], self.weight[...,0], self.bias[...,0])
+        x2 = F.linear(x[...,1], self.weight[...,1], self.bias[...,1])
+
+        return torch.stack([x1,x2],-1)
 class ComplexConv1d(torch.nn.Conv1d):
     def __init__(self,in_channels, out_channels, kernel_size, bias=True,**kargs):
         kernel_size = _single(kernel_size)
@@ -64,8 +113,6 @@ class ComplexConv2d(torch.nn.Conv2d):
             in_channels, out_channels, kernel_size, bias=bias,**kargs)
         if bias:
             self.bias = Parameter(torch.randn(len(self.bias),2))
-
-
     def forward(self, x):
         pad_num=self.padding
         if self.padding_mode == 'circular':
@@ -74,12 +121,18 @@ class ComplexConv2d(torch.nn.Conv2d):
                                                          0,                    0)
             x = F.pad(x, expanded_padding, mode='circular')
             pad_num = _pair(0)
-
         x= C.complex_conv2d(x, self.weight,bias=self.bias,
                          stride=self.stride,padding=pad_num,
                          dilation=self.dilation,groups=self.groups)
         x.__class__ = ComplexTensor
         return x
+class RealizedConv2d(torch.nn.Conv2d):
+
+    def forward(self,x):
+        return F.conv3d(x, self.weight, self.bias, self.stride,
+                        self.padding, self.dilation, self.groups)[...,:2]
+
+
 class ComplexConv3d(torch.nn.Conv3d):pass
 
 

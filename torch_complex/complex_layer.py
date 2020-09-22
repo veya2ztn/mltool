@@ -5,7 +5,6 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import numpy as np
 from torch.nn.modules.utils import _pair,_single,_triple
-
 def _force_triple(size,end=None):
     if len(size)==1 or len(size)==3:return _triple(size)
     else:
@@ -18,13 +17,20 @@ def Realization(module):
     module_output = module
     if isinstance(module, ComplexConv2d):
         assert (module.bias is None) or (module.bias == False)
-        module_output = RealizedConv2d(in_channels =module.in_channels ,
+        module_output = torch.nn.Conv3d(in_channels =module.in_channels ,
                                         out_channels=module.out_channels,
                                         kernel_size =_force_triple(module.kernel_size ,2),
                                         stride      =_force_triple(module.stride      ,1),
                                         padding     =_force_triple(module.padding     ,1),
-                                        dilation    =_force_triple(module.dilation    ,1),
+                                        dilation    =_force_triple(module.dilation    ,2),
                                         bias        =False)
+        # module_output = RealizedConv2d(in_channels =module.in_channels ,
+        #                                 out_channels=module.out_channels,
+        #                                 kernel_size =_force_triple(module.kernel_size ,2),
+        #                                 stride      =_force_triple(module.stride      ,1),
+        #                                 padding     =_force_triple(module.padding     ,1),
+        #                                 dilation    =_force_triple(module.dilation    ,1),
+        #                                 bias        =False)
     elif isinstance(module, ComplexLinear):
         module_output = GroupedLinear(in_features =module.in_features ,
                                        out_features=module.out_features,
@@ -36,6 +42,23 @@ def Realization(module):
         module_output.add_module(name, Realization(child))
     del module
     return module_output
+
+def Realization_Conv2d_first_layer(module):
+    module_output = module
+    if isinstance(module, ComplexConv2d):
+        assert (module.bias is None) or (module.bias == False)
+        module_output = RealizedConv2d(in_channels =module.in_channels ,
+                                        out_channels=module.out_channels,
+                                        kernel_size =_force_triple(module.kernel_size ,2),
+                                        stride      =_force_triple(module.stride      ,1),
+                                        padding     =_force_triple(module.padding     ,1),
+                                        dilation    =_force_triple(module.dilation    ,1),
+                                        bias        =False)
+    for name, child in module.named_children():
+        module_output.add_module(name, Realization_Conv2d_first_layer(child))
+    del module
+    return module_output
+
 
 class ComplexLinear(torch.nn.Linear):
     '''

@@ -74,8 +74,15 @@ class RealizedLinear(torch.nn.Linear):
     def forward(self,x):
         assert x.shape[-1]==2
         return F.linear(x.flatten(start_dim=-2), self.weight, self.bias).reshape(tuple(list(x.shape)[:-2]+[-1,2]))
-class GroupedLinear(ComplexLinear):
-
+class GroupedLinear(torch.nn.Linear):
+    def __init__(self, in_features, out_features, bias=True):
+        super().__init__(in_features,out_features, bias=bias)
+        self.weight  = Parameter(torch.Tensor(out_features,in_features,2))
+        if bias:
+            self.bias = Parameter(torch.Tensor(out_features,2))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
     def forward(self,x):
         assert x.shape[-1]==2
         x1 = F.linear(x[...,0], self.weight[...,0], self.bias[...,0])

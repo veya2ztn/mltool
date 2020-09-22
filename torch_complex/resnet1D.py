@@ -137,7 +137,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        assert x.shape[-1]==2
+        x = x.reshape(x.size(0),x.size(1),-1,2)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)

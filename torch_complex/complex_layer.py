@@ -59,7 +59,17 @@ def Realization_Conv2d_first_layer(module):
     del module
     return module_output
 
-
+def FullComplexed(module):
+    module_output = module
+    if isinstance(module, torch.nn.Sigmoid) or \
+       isinstance(module, torch.nn.ReLU)    or \
+       isinstance(module, torch.nn.LeakyReLU) or \
+       isinstance(module, torch.nn.Tanh):
+        module_output = ComplexTanh()
+    for name, child in module.named_children():
+        module_output.add_module(name, FullComplexed(child))
+    del module
+    return module_output
 class ComplexLinear(torch.nn.Linear):
     '''
     Applies a linear transformation to the incoming data:
@@ -183,6 +193,16 @@ class ComplexReLU(torch.nn.ReLU):
         inplace_str = 'inplace=True' if self.inplace else ''
         return inplace_str
 
+class ComplexTanh(torch.nn.Tanh):
+    def forward(self, x):
+        assert x.shape[-1]==2
+        x = C.complex_tanh(x)
+        x.__class__ = ComplexTensor
+        return x
+
+    # def extra_repr(self):
+    #     inplace_str = 'inplace=True' if self.inplace else ''
+    #     return inplace_str
 class ComplexReImNorm1d(torch.nn.Module):pass
 class ComplexReImNorm2d(torch.nn.Module):
     '''

@@ -131,6 +131,10 @@ def complex_conv2d(inputs,filters,bias=None,**kargs):
     o_r = convfun(x_r,w_r,b_r) - convfun(x_i,w_i,None)
     o_i = convfun(x_r,w_i,b_i) + convfun(x_i,w_r,None)
 
+    ### another implement
+    ##  but with very slow performance
+    # o_r = F.conv3d(_inputs*torch.Tensor([1,-1]),_filter,stride=(stride,stride,1),padding=(padding,padding,0))
+    # o_i = F.conv3d(_inputs,_filter.flip(-1),stride=(stride,stride,1),padding=(padding,padding,0))
     return torch.stack([o_r, o_i], dim = -1)
 
 def complex_conv1d(inputs,filters,bias=None,**kargs):
@@ -151,6 +155,23 @@ def complex_conv1d(inputs,filters,bias=None,**kargs):
     o_i = convfun(x_r,w_i,b_i) + convfun(x_i,w_r,None)
 
     return torch.stack([o_r, o_i], dim = -1)
+
+def complex_tanh(tensor:torch.Tensor)-> torch.Tensor:
+    x,y  = tensor.split(1,dim=-1)
+    x = 2*x
+    y = 2*y
+    n = y.cos() + x.cosh() + 1e-8
+    #real = x.sinh()/n
+    #imag = y.sin()/n
+    return torch.cat([x.sinh()/n, y.sin()/n], dim = -1)
+
+def complex_sigmoid(tensor:torch.Tensor)-> torch.Tensor:
+    x,y  = tensor.split(1,dim=-1)
+    x = torch.exp(-x)
+    a = 1+x*y.cos()
+    b = x*y.sin()
+    n = a**2+b**2+ 1e-8
+    return torch.cat([a/n, b/n], dim = -1)
 
 
 def complexize(tensor: torch.Tensor)-> torch.Tensor:

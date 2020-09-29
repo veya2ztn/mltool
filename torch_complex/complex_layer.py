@@ -5,71 +5,11 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import numpy as np
 from torch.nn.modules.utils import _pair,_single,_triple
-def _force_triple(size,end=None):
-    if len(size)==1 or len(size)==3:return _triple(size)
-    else:
-        assert size[0]==size[1]
-        if end is None:
-            return _triple(size[0])
-        else:
-            return tuple(list(size)+[end])
-def Realization(module):
-    module_output = module
-    if isinstance(module, ComplexConv2d):
-        assert (module.bias is None) or (module.bias == False)
-        module_output = torch.nn.Conv3d(in_channels =module.in_channels ,
-                                        out_channels=module.out_channels,
-                                        kernel_size =_force_triple(module.kernel_size ,2),
-                                        stride      =_force_triple(module.stride      ,1),
-                                        padding     =_force_triple(module.padding     ,1),
-                                        dilation    =_force_triple(module.dilation    ,2),
-                                        bias        =False)
-        # module_output = RealizedConv2d(in_channels =module.in_channels ,
-        #                                 out_channels=module.out_channels,
-        #                                 kernel_size =_force_triple(module.kernel_size ,2),
-        #                                 stride      =_force_triple(module.stride      ,1),
-        #                                 padding     =_force_triple(module.padding     ,1),
-        #                                 dilation    =_force_triple(module.dilation    ,1),
-        #                                 bias        =False)
-    elif isinstance(module, ComplexLinear):
-        module_output = GroupedLinear(in_features =module.in_features ,
-                                       out_features=module.out_features,
-                                       bias        =False if module.bias is None else True        ,)
-        # module_output = RealizedLinear(in_features =module.in_features*2 ,
-        #                                out_features=module.out_features*2,
-        #                                bias        =False if module.bias is None else True        ,)
-    for name, child in module.named_children():
-        module_output.add_module(name, Realization(child))
-    del module
-    return module_output
+from .layer_transformer import SemiToReal ,SemiToReal_Conv2d_first_layer
 
-def Realization_Conv2d_first_layer(module):
-    module_output = module
-    if isinstance(module, ComplexConv2d):
-        assert (module.bias is None) or (module.bias == False)
-        module_output = RealizedConv2d(in_channels =module.in_channels ,
-                                        out_channels=module.out_channels,
-                                        kernel_size =_force_triple(module.kernel_size ,2),
-                                        stride      =_force_triple(module.stride      ,1),
-                                        padding     =_force_triple(module.padding     ,1),
-                                        dilation    =_force_triple(module.dilation    ,1),
-                                        bias        =False)
-    for name, child in module.named_children():
-        module_output.add_module(name, Realization_Conv2d_first_layer(child))
-    del module
-    return module_output
+Realization = SemiToReal
+Realization_Conv2d_first_layer=SemiToReal_Conv2d_first_layer
 
-def FullComplexed(module):
-    module_output = module
-    if isinstance(module, torch.nn.Sigmoid) or \
-       isinstance(module, torch.nn.ReLU)    or \
-       isinstance(module, torch.nn.LeakyReLU) or \
-       isinstance(module, torch.nn.Tanh):
-        module_output = ComplexTanh()
-    for name, child in module.named_children():
-        module_output.add_module(name, FullComplexed(child))
-    del module
-    return module_output
 class ComplexLinear(torch.nn.Linear):
     '''
     Applies a linear transformation to the incoming data:
@@ -171,11 +111,7 @@ class RealizedConv2d(torch.nn.Conv2d):
     def forward(self,x):
         return F.conv3d(x, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)[...,:2]
-
-
 class ComplexConv3d(torch.nn.Conv3d):pass
-
-
 class ComplexReLU(torch.nn.ReLU):
     __constants__ = ['inplace']
     def __init__(self, inplace=False):
@@ -192,17 +128,23 @@ class ComplexReLU(torch.nn.ReLU):
     def extra_repr(self):
         inplace_str = 'inplace=True' if self.inplace else ''
         return inplace_str
-
 class ComplexTanh(torch.nn.Tanh):
     def forward(self, x):
         assert x.shape[-1]==2
-        x = C.complex_tanh(x)
+        if int(torch.__version__.split('.')[0])>=1 and int(torch.__version__.split('.')[1])>=6 and False:
+            # torch 1.6 has complex operation support
+            x = torch.view_as_complex(x)
+            x = x.tanh()
+            x = torch.view_as_real(x)
+        else:
+            x = C.complex_tanh(x)
         x.__class__ = ComplexTensor
         return x
 
     # def extra_repr(self):
     #     inplace_str = 'inplace=True' if self.inplace else ''
     #     return inplace_str
+
 class ComplexReImNorm1d(torch.nn.Module):pass
 class ComplexReImNorm2d(torch.nn.Module):
     '''
@@ -211,10 +153,9 @@ class ComplexReImNorm2d(torch.nn.Module):
     reeize imag to (0,2*pi) Gauss distribution
     '''
     def __init__(self,num_features, **kargs):
-        super(ComplexBatchNorm2d,self).__init__()
+        super().__init__()
         self.r_norm=torch.nn.BatchNorm2d(num_features, **kargs)
         self.i_norm=torch.nn.BatchNorm2d(num_features, **kargs)
-        self.weight
     def forward(self,x):
         real = x[...,0]
         imag = x[...,1]

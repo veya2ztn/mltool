@@ -156,14 +156,72 @@ def complex_conv1d(inputs,filters,bias=None,**kargs):
 
     return torch.stack([o_r, o_i], dim = -1)
 
-def complex_tanh(tensor:torch.Tensor)-> torch.Tensor:
-    x,y  = tensor.split(1,dim=-1)
-    x = 2*x
-    y = 2*y
-    n = y.cos() + x.cosh() + 1e-8
-    #real = x.sinh()/n
-    #imag = y.sin()/n
-    return torch.cat([x.sinh()/n, y.sin()/n], dim = -1)
+# def complex_tanh(tensor:torch.Tensor)-> torch.Tensor:
+#     #tensor = F.softplus(tensor) # avoid inf
+#     x,y  = tensor.split(1,dim=-1)
+#     x = 2*x
+#     y = 2*y
+#     real = x.tanh()/(y.cos()/x.cosh() +1)
+#     imag = y.sin()/(y.cos() + x.cosh() + 1e-8)
+#     #real = x.sinh()/n
+#     #imag = y.sin()/n
+#     return torch.cat([real, imag], dim = -1)
+class ComplexTanh(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input):
+        """
+        In the forward pass we receive a Tensor containing the input and return
+        a Tensor containing the output. ctx is a context object that can be used
+        to stash information for backward computation. You can cache arbitrary
+        objects for use in the backward pass using the ctx.save_for_backward method.
+        """
+        ctx.save_for_backward(input)
+        x,y  = input.split(1,dim=-1)
+        x = 2*x
+        y = 2*y
+        real = x.tanh()/(y.cos()/x.cosh() +1)
+        imag = y.sin()/(y.cos() + x.cosh() + 1e-8)
+        return torch.cat([real, imag], dim = -1)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        In the backward pass we receive a Tensor containing the gradient of the loss
+        with respect to the output, and we need to compute the gradient of the loss
+        with respect to the input.
+        f(x,y) = tanh(z) = u(x,y)+1j*v(x,y)
+        grad_matrix =| \partial u |\partial u |
+                     | ---------- |---------- |
+                     | \partial x |\partial y |
+                     |    ---     |    ---    |
+                     | \partial v |\partial v |
+                     | ---------- |---------- |
+                     | \partial x |\partial y |
+
+        """
+
+        input, = ctx.saved_tensors
+        x,y  = input.split(1,dim=-1)
+        x = 2*x
+        y = 2*y
+        ys = y.sin()
+        yc = y.cos()
+        xch= x.cosh()
+        xth= x.tanh()
+        n  =  (1+yc/xch)**2
+        ux =  2 +2*yc/xch-2*xth**2
+        uy =  2*(ys/xch)*xth
+        ux =  ux/n
+        uy =  uy/n
+        vx =  -uy
+        vy =  ux
+
+        u,v= grad_output.split(1,dim=-1)
+
+        real = u*ux+v*vx
+        imag =-u*uy-v*vy # miners is required by complex number.
+        return torch.cat([real,imag],-1)
+complex_tanh = ComplexTanh.apply
 
 def complex_sigmoid(tensor:torch.Tensor)-> torch.Tensor:
     x,y  = tensor.split(1,dim=-1)

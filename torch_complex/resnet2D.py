@@ -148,7 +148,10 @@ class ResNet(nn.Module):
         x = self.layer4(x)
 
         x = self.avgpool(x)
-        x = x.view(x.size(0), -1,2)
+        if x.shape[-1]==2:
+            x = x.view(x.size(0), -1,2)
+        else:
+            x = x.view(x.size(0), -1)
         x = self.fc(x)
 
         return x

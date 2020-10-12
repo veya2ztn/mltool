@@ -502,7 +502,9 @@ import json
 from collections import OrderedDict
 
 class ModelSaver:
-    def __init__(self,path,accu_list,es_max_window=20,es_mode="no_min_more",**kargs):
+    def __init__(self,path,accu_list,es_max_window=20,es_mode="no_min_more",
+                        trace_latest_interval = 20,
+                        block_best_interval   = 100,**kargs):
         self.status_file  = os.path.join(path,'saver_info.json')
         self.routine_path = os.path.join(path,'routine')
         if not os.path.exists(self.routine_path):os.makedirs(self.routine_path)
@@ -520,6 +522,8 @@ class ModelSaver:
             self._initial()
         else:
             self._reload()
+        self.trace_latest_interval = trace_latest_interval
+        self.block_best_interval   = block_best_interval
     def _initial(self):
         status_now = {}
         status_now['now_epoch'] = -1
@@ -542,7 +546,8 @@ class ModelSaver:
         ### model saving.............
         name_at_save = "latest_weight_now"
         path_at_save = os.path.join(self.routine_path,name_at_save)
-        model.save_to(path_at_save)
+        if epoch%self.trace_latest_interval==0:
+            model.save_to(path_at_save)
     def save_best_model(self,model,accu_pool,epoch,doearlystop=True,save_inteval=20,**kargs):
         status_now = self._get_status()
         total_estop= 0
@@ -551,7 +556,7 @@ class ModelSaver:
             accu = accu_pool[accu_type]
             best = accu_pool['best_'+accu_type]
             if accu <= best:
-                self.model_weight[accu_type] = model.all_state_dict()
+                self.model_weight[accu_type]      = model.all_state_dict()
                 self.last_save_epoch[accu_type]   = [epoch,False]
             else:
                 last_epoch,saveQ=self.last_save_epoch[accu_type]
@@ -563,7 +568,8 @@ class ModelSaver:
                         if os.path.exists(last_best_path):os.remove(last_best_path)
                     name_at_save = 'epoch{}.best_{}_{:.4f}'.format(epoch,accu_type,accu)
                     path_at_save = os.path.join(self.best_path,name_at_save)
-                    torch.save(self.model_weight[accu_type],path_at_save)
+                    if epoch>self.block_best_interval:
+                        torch.save(self.model_weight[accu_type],path_at_save)
                     status_now['best_'+accu_type]={'epoch':epoch,'score':accu}
                     self.temp_info[temp_key] = path_at_save
 

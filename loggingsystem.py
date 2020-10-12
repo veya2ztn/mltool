@@ -3,7 +3,6 @@ from .fastprogress import master_bar, progress_bar,isnotebook
 from tensorboardX import SummaryWriter
 import tensorboardX
 import os
-import json
 class LoggingSystem:
     '''
     How to use:
@@ -23,10 +22,8 @@ class LoggingSystem:
         self.Q_batch_loss_record = False
         self.master_bar = None
         self.gpu_now    = gpu
-        self.hyperaram_file = os.path.join(self.ckpt_root,'hyperaram.json')
-        if not os.path.exists(self.ckpt_root):os.makedirs(self.ckpt_root)
-    def train(self):
 
+    def train(self):
         if not self.global_do_log:return
         self.progress_bar = self.train_bar
         self.recorder     = self.train_recorder
@@ -114,16 +111,7 @@ class LoggingSystem:
         if not self.global_do_log:return
         if self.Q_recorder_type == 'tensorboard':
             self.recorder.export_scalars_to_json(os.path.join(self.ckpt_root,"all_scalars.json"))
-    def save_hparam(self,_dict):
-        with open(self.hyperaram_file,'w') as f:
-            json.dump(_dict,f)
-    def get_hparam(self):
-        if os.path.exists(self.hyperaram_file):
-            with open(self.hyperaram_file,'r') as f:
-                _dict=json.load(f)
-            return _dict
-        else:
-            return False
+
     def close(self):
         if not self.global_do_log:return
         if self.recorder is not None:  self.recorder.close()

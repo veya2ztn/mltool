@@ -543,7 +543,7 @@ class ModelSaver:
         name_at_save = "latest_weight_now"
         path_at_save = os.path.join(self.routine_path,name_at_save)
         model.save_to(path_at_save)
-    def save_best_model(self,model,accu_pool,epoch,doearlystop=True,save_inteval=10,**kargs):
+    def save_best_model(self,model,accu_pool,epoch,doearlystop=True,save_inteval=20,**kargs):
         status_now = self._get_status()
         total_estop= 0
 

@@ -5,10 +5,9 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import numpy as np
 from torch.nn.modules.utils import _pair,_single,_triple
-from .layer_transformer import SemiToReal ,SemiToReal_Conv2d_first_layer
-
-Realization = SemiToReal
-Realization_Conv2d_first_layer=SemiToReal_Conv2d_first_layer
+#from .layer_transformer import SemiToReal ,SemiToReal_Conv2d_first_layer
+# Realization = SemiToReal
+# Realization_Conv2d_first_layer=SemiToReal_Conv2d_first_layer
 
 class ComplexLinear(torch.nn.Linear):
     '''

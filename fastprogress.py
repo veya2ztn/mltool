@@ -122,8 +122,7 @@ class ProgressBar():
         return True
 
     def restart(self,gen=None,total=None):
-        total=self.total
-        display=self.display
+        display= self.display
         leave=self.leave
         parent=self.parent
         auto_update=self.auto_update

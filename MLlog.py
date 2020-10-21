@@ -96,7 +96,10 @@ class Curve_data(object):
 
 from .fastprogress import isnotebook
 
-import tensorwatch as tw
+try:
+    import tensorwatch as tw
+except:
+    tw=None
 
 IS_NOTEBOOK=isnotebook()
 

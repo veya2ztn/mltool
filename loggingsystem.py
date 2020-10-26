@@ -12,7 +12,7 @@ class LoggingSystem:
         logsys.terminaler.
         logsys.webtracker.
     '''
-    def __init__(self,global_do_log,ckpt_root,gpu=0):
+    def __init__(self,global_do_log,ckpt_root,gpu=0,verbose=True):
         self.global_do_log = global_do_log
         self.diable_logbar = not global_do_log
         self.ckpt_root     = ckpt_root
@@ -22,7 +22,7 @@ class LoggingSystem:
         self.Q_batch_loss_record = False
         self.master_bar = None
         self.gpu_now    = gpu
-        print(f"log at {ckpt_root}")
+        if verbose:print(f"log at {ckpt_root}")
 
     def train(self):
         if not self.global_do_log:return
@@ -42,15 +42,17 @@ class LoggingSystem:
             self.recorder.step([value])
             self.recorder.auto_save_loss()
 
-
-
     def add_figure(self,name,figure,epoch):
         if not self.global_do_log:return
         if self.Q_recorder_type == 'tensorboard':
             self.recorder.add_figure(name,figure,epoch)
+
     def create_master_bar(self,batches,banner_info=None):
         if banner_info is not None and self.global_do_log:print(banner_info)
-        self.master_bar = master_bar(range(batches), disable=self.diable_logbar)
+        if   isinstance(batches,int):batches=range(batches)
+        elif isinstance(batches,list):pass
+        else:raise NotImplementedError
+        self.master_bar = master_bar(batches, disable=self.diable_logbar)
         return self.master_bar
 
     def create_progress_bar(self,batches,force=False,**kargs):

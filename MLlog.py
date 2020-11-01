@@ -287,13 +287,13 @@ class LossStores:
         sort=sorted(self.store.items(), key=lambda d: d[1])
         return sort[num-1][1]
 
-    def earlystop(self,num,max_length=30,anti_over_fit_length=50,max_tail=40,mode="no_min_more"):
+    def earlystop(self,num,eps=0.00001,max_length=30,anti_over_fit_length=50,max_tail=40,mode="no_min_more"):
         self.buffer = list(self.store.values())
         if len(self.buffer)<=max_length:return False
         window = self.buffer[-max_length:]
         if mode == "no_min_more":
             #if num > max(window)*0.99:return True
-            if num > max(window)-0.00001:return True
+            if num > max(window)-eps:return True
         if np.argmin(self.buffer) < len(self.buffer)-max_tail:return True
         #if min(window)>num-0.00001:return True #for real bad case
         anti_over_fit_min = self.buffer[-anti_over_fit_length:]
@@ -608,7 +608,9 @@ class ModelSaver:
             if epoch+1== epoches:end_flag = True
             if accu_type not in self.saved_epoch_record:self.saved_epoch_record[accu_type]=OrderedDict()
             now_saved_recorder= self.saved_epoch_record[accu_type]
-            earlystopQ        = self.loss_stores[accu_type].earlystop(accu,max_length=self.early_stop_window,mode=self.early_stop_mode)
+            if "MAE" in accu_type:eps=0.001
+            else:eps=0.00001
+            earlystopQ        = self.loss_stores[accu_type].earlystop(accu,eps=eps,max_length=self.early_stop_window,mode=self.early_stop_mode)
             total_estop      += earlystopQ
             self.loss_stores[accu_type].update(accu,epoch)
 

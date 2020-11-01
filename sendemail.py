@@ -1,5 +1,10 @@
 import smtplib
 from email.mime.text import MIMEText
+import json
+import os
+
+def read_json(path):
+    with open(path,'r') as f:return json.load(f)
 #设置服务器所需信息
 #163邮箱服务器地址
 mail_host = 'smtp.163.com'
@@ -14,8 +19,15 @@ receivers = ['645506775@qq.com']
 
 #设置email信息
 #邮件内容设置
-
+CONStatusRecorder=".ConnectionStatus.json"
 def send_message(text,mode):
+    
+    if os.path.exists(CONStatusRecorder):
+        connection = read_json(CONStatusRecorder)["status"]
+    else:
+        connection = 1
+    if connection < 1:return
+
     if mode in ['success','fail'] :
         message = MIMEText('project name:<| '+text+' |>','plain','utf-8')
         message['Subject'] = '[Trainning][Success]' if mode=='success' else '[Trainning][Fail]'
@@ -32,8 +44,8 @@ def send_message(text,mode):
 
     #发送方信息
     message['From'] = sender
-    #接受方信息
     message['To'] = receivers[0]
+
     try:
         smtpObj = smtplib.SMTP()
         #连接到服务器
@@ -41,12 +53,12 @@ def send_message(text,mode):
         #登录到服务器
         smtpObj.login(mail_user,mail_pass)
         #发送
-        smtpObj.sendmail(
-            sender,receivers,message.as_string())
-        #退出
+        smtpObj.sendmail(sender,receivers,message.as_string())
         smtpObj.quit()
         print('sand a {} message'.format("success" if mode=="success" else "fail"))
     except smtplib.SMTPException as e:
+        connection={"status":0}
+        with open(CONStatusRecorder,'w') as f:json.dump(connection,f)
         print('error',e) #打印错误
 
 import sys

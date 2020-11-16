@@ -528,8 +528,8 @@ class ModelSaver:
         for accu_type in accu_list:
             self.loss_stores[accu_type]=LossStores()
         if not os.path.exists(self.status_file):self._initial()
-        else:self._reload()
-
+        else:
+            self._reload()
         self.saved_epoch_record=self.status['saved_epoch_record']
     def _initial(self):
         self.status = {}
@@ -539,6 +539,7 @@ class ModelSaver:
         self._save_status(self.status)
 
     def _reload(self):
+        print("we will now reload the accu-tracking")
         status_now = self._get_status()
         self.status= status_now
         if 'saved_epoch_record' not in self.status:
@@ -558,7 +559,12 @@ class ModelSaver:
             for accu_type in self.accu_list:
                 accu = pool[accu_type]
                 self.loss_stores[accu_type].update(accu,epoch)
-
+        ### show a snap
+        print("below is a snap for the previous training tracking")
+        for accu_type in self.accu_list:
+            keys = list(self.loss_stores[accu_type].store.keys())[-20]
+            values=",".join(["{:.4f}".format(self.loss_stores[accu_type].store[key]) for key in keys])
+            print(f"{accu_type}:{values}")
     def _get_status(self):
         # the _status record in a json file named "saver_info.json"
         with open(self.status_file,'r') as f:
@@ -595,7 +601,7 @@ class ModelSaver:
             raise
         start_epoch = int(start_epoch[0])
         return weight_path,start_epoch
-    def save_best_model(self,model,accu_pool,epoch,doearlystop=True,save_inteval=20,epoches=None,**kargs):
+    def save_best_model(self,model,accu_pool,epoch,doearlystop=True,eps=None,save_inteval=20,epoches=None,**kargs):
         if epoches is None:epoches = self.epoches
         total_estop= 0
         for accu_type in self.accu_list:
@@ -608,38 +614,30 @@ class ModelSaver:
             if epoch+1== epoches:end_flag = True
             if accu_type not in self.saved_epoch_record:self.saved_epoch_record[accu_type]=OrderedDict()
             now_saved_recorder= self.saved_epoch_record[accu_type]
-            if "MAE" in accu_type:eps=0.001
-            else:eps=0.00001
+            if eps is None:
+                if "MAE" in accu_type:eps=0.001
+                else:eps=0.00001
             earlystopQ        = self.loss_stores[accu_type].earlystop(accu,eps=eps,max_length=self.early_stop_window,mode=self.early_stop_mode)
             total_estop      += earlystopQ
             self.loss_stores[accu_type].update(accu,epoch)
-
             if epoch>=1:
                 last_epoch = epoch-1
-                if last_epoch not in now_saved_recorder:
-                    last_epoch = list(now_saved_recorder.keys())[-1]
+                if last_epoch not in now_saved_recorder:last_epoch = list(now_saved_recorder.keys())[-1]
                 best_epoch,best_value,saveQ,earlystopQ,best_weight_name = now_saved_recorder[last_epoch]
                 best_epoch=int(best_epoch)
                 best_value=float(best_value)
-
             if earlystopQ or end_flag:force_do =True
             if accu <= best:
                 self.model_weight[accu_type]  = model.all_state_dict()
                 best_epoch = epoch
                 best_value = accu
                 saveQ      = False
-
-
-
-
             if (not saveQ) and (epoch>self.block_best_interval) and (accu_type in self.model_weight):
                 if epoch - best_epoch > save_inteval:do_save=True
                 if epoch%30==1:do_save=True
             if force_do:do_save=True
-
             if do_save:
                 # clear last save
-
                 best_weight_path = os.path.join(self.best_path,best_weight_name)
                 if os.path.exists(best_weight_path):os.remove(best_weight_path)
                 best_weight_name = 'epoch{}.best_{}_{:.4f}'.format(best_epoch,accu_type,best_value)
@@ -649,7 +647,6 @@ class ModelSaver:
                 self.status['best_'+accu_type]={'epoch':epoch,'score':accu}
                 saveQ=True
             now_saved_recorder[epoch] = [best_epoch,best_value,saveQ,earlystopQ,best_weight_name]
-
         self.status['now_epoch'] = epoch
         time_at_save= time.strftime("%m_%d_%H_%M")
         self.status['routine'][epoch]=accu_pool

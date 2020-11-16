@@ -78,11 +78,25 @@ class Discriminator(torch.nn.Module):
         x = self.main_module(x)
         return x.view(-1, 1024*4*4)
 
+
+class Binary_Checker(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.weight = nn.Parameter(torch.Tensor(1))
+    def forward(self,x):
+        # x in [-1,1]
+        # 1-x^2
+        shape=tuple(range(1,len(x.shape)))
+        return (x**2).mean(shape).unsqueeze(1)
+
 class DCGAN_MODEL(object):
     def __init__(self, args):
         print("DCGAN model initalization.")
         self.G = Generator(args.channels)
-        self.D = Discriminator(args.channels)
+        if args.model == "ForceBINARY":
+            self.D = Binary_Checker()
+        else:
+            self.D = Discriminator(args.channels)
         self.C = args.channels
 
         # binary cross entropy loss and optimizer
@@ -330,15 +344,17 @@ class DCGAN_MODEL(object):
         utils.save_image(grid, 'interpolated_images/interpolated_{}.png'.format(str(number).zfill(3)))
         print("Saved interpolated images to interpolated_images/interpolated_{}.".format(str(number).zfill(3)))
 
-    def save_to(self,path):
-        checkpoint = self.all_state_dict()
+    def save_to(self,path,mode="full"):
+        checkpoint = self.all_state_dict(mode=mode)
         torch.save(checkpoint,path)
 
-    def all_state_dict(self):
+    def all_state_dict(self,mode="full"):
         checkpoint={}
         checkpoint['D_state_dict']    = self.D.state_dict()
-        checkpoint['D_optimizer']     = self.d_optimizer.state_dict()
         checkpoint['G_state_dict']    = self.G.state_dict()
-        checkpoint['G_optimizer']     = self.g_optimizer.state_dict()
-        checkpoint['C_optimizer']     = self.c_optimizer.state_dict()
+        if mode != "light":
+            if hasattr(self,"I2C"):checkpoint['C_state_dict']    = self.I2C.state_dict()
+            checkpoint['D_optimizer']     = self.d_optimizer.state_dict()
+            checkpoint['G_optimizer']     = self.g_optimizer.state_dict()
+            checkpoint['C_optimizer']     = self.c_optimizer.state_dict()
         return checkpoint

@@ -21,7 +21,10 @@ class LoggingSystem:
         self.Q_recorder_type = 'tensorboard'
         self.Q_batch_loss_record = False
         self.master_bar = None
+        self.train_bar  = None
+        self.valid_bar  = None
         self.gpu_now    = gpu
+
         if verbose:print(f"log at {ckpt_root}")
 
     def train(self):

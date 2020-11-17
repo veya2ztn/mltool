@@ -71,12 +71,16 @@ def smoothheatdensity(x,y):
     # Plot the result as an image
     plt.imshow(Z.reshape(Xgrid.shape),origin='lower', aspect='auto',extent=[min(x), max(x), min(y), max(y)], cmap='Blues')
 
-def errorbarplot(data,x_axis=None,color='r',alpha=0.3,label=None,**kargs):
+def errorbarplot(data,x_axis=None,error_mode='var',color='r',alpha=0.3,label=None,**kargs):
     assert len(data.shape)==2
-    y_axis = data.mean(0)
-    if x_axis is None:x_axis = np.arange(len(y_axis))
 
-    y_err  = data.var(0)
+    mean = data.mean(0)
+    var  = data.var(0)
+    ku   = ((data - mean) ** 4).mean(0) / (var**2+0.01) #计算峰度
 
-    plt.errorbar(x_axis, y_axis, yerr = y_err,alpha=alpha,color=color,**kargs)
-    plt.plot(x_axis, y_axis, linewidth=3,color=color,label=label)
+    if   error_mode == "var": err  = var
+    elif error_mode == "ku":  err  = ku
+    else:raise
+    if x_axis is None:x_axis = np.arange(len(mean))
+    plt.errorbar(x_axis, mean, yerr = err,alpha=alpha,color=color,**kargs)
+    plt.plot(x_axis, mean, linewidth=3,color=color,label=label)

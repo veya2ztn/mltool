@@ -6,6 +6,7 @@ import copy
 import torch.nn.functional as F
 import os,re
 
+
 #######################################
 #######  LOG_RECORDER   ###############
 #######################################
@@ -626,7 +627,8 @@ class ModelSaver:
 
             ### update temp status
             if accu < best_value:
-                self.model_weight[accu_type]  = model.all_state_dict(epoch=epoch,mode="light")
+                # if you want to catsh the state_dict in Memory, you neet copy.deepcopy it
+                self.model_weight[accu_type]  = copy.deepcopy(model.all_state_dict(epoch=epoch,mode="light"))
                 best_epoch = epoch
                 best_value = accu
                 saveQ      = False

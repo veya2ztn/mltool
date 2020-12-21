@@ -348,13 +348,14 @@ class DCGAN_MODEL(object):
         checkpoint = self.all_state_dict(mode=mode)
         torch.save(checkpoint,path)
 
-    def all_state_dict(self,mode="full"):
+    def all_state_dict(self,epoch=None,mode="full"):
         checkpoint={}
+        checkpoint['epoch'] = epoch
         checkpoint['D_state_dict']    = self.D.state_dict()
         checkpoint['G_state_dict']    = self.G.state_dict()
         if mode != "light":
-            if hasattr(self,"I2C"):checkpoint['C_state_dict']    = self.I2C.state_dict()
-            checkpoint['D_optimizer']     = self.d_optimizer.state_dict()
-            checkpoint['G_optimizer']     = self.g_optimizer.state_dict()
-            checkpoint['C_optimizer']     = self.c_optimizer.state_dict()
+            if hasattr(self,"I2C"):checkpoint['C_state_dict']            = self.I2C.state_dict()
+            if hasattr(self,"D_optimizer"):checkpoint['D_optimizer']     = self.d_optimizer.state_dict()
+            if hasattr(self,"G_optimizer"):checkpoint['G_optimizer']     = self.g_optimizer.state_dict()
+            if hasattr(self,"C_optimizer"):checkpoint['C_optimizer']     = self.c_optimizer.state_dict()
         return checkpoint

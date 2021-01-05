@@ -4,7 +4,7 @@ from warnings import warn
 import shutil,os
 import tqdm
 
-__all__ = ['master_bar', 'progress_bar', 'IN_NOTEBOOK', 'force_console_behavior']
+#__all__ = ['master_bar', 'progress_bar', 'IN_NOTEBOOK']
 
 CLEAR_OUTPUT = True
 NO_BAR = False
@@ -12,7 +12,7 @@ NO_BAR = False
 SAVE_PATH = None
 SAVE_APPEND = False
 MAX_COLS = 160
-
+RegistSize ={'plot':(6,4),'imshow':(4,4)}
 def isnotebook():
     try:
         from google import colab
@@ -285,38 +285,59 @@ class NBMasterBar(MasterBar):
         if y_bounds is not None: self.graph_ax.set_ylim(*y_bounds)
         self.graph_out.update(self.graph_ax.figure)
 
-    def set_multiply_graph(self,nrow=1,ncol=2, figsize=(6,4)):
+    def set_multiply_graph(self,nrows=1,ncols=2, engine=None, figsize=(6,4)):
+        # engine demo [[plot,imshow],[plot,imshow]]
+        if engine is None:
+            engine = [['plot']*ncols]*nrows
+        else:
+            nrows = len(engine)  # default
+            ncols = max([len(row) for row in engine])
+        figsize_row = max([np.sum([RegistSize[e][0] for e in row]) for row in engine])
+        figsize_col = nrows*4
+        figsize = (figsize_row,figsize_col)
         self.multiply_graph_set = True
-        self.graph_fig,  graph_axes = plt.subplots(nrows=nrow, ncols=ncol, figsize=figsize)
-        self.graph_axes= graph_axes.flatten()
-        if not hasattr(self, 'graph_out'):
-            self.graph_out = display(self.graph_axes[0].figure, display_id=True)
-            self.imgs_out=self.graph_out
-    def update_graph_multiply(self, graphs, x_bounds=None, y_bounds=None, figsize=(6,4)):
+        self.graph_fig,  graph_axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize)
+        if isinstance(graph_axes,np.ndarray):
+            if len(graph_axes.shape) == 1:graph_axes=np.array([graph_axes])
+        else:
+            graph_axes=np.array([[graph_axes]])
+        self.graph_axes = graph_axes
+        self.engine     = engine
+#         if not hasattr(self, 'graph_out'):
+#             if isinstance(self.graph_axes,list):
+#                 ax = self.graph_axes.flatten()[0]
+#             else:
+#                 ax = self.graph_axes
+#             self.graph_out = display(ax.figure, display_id=True)
+#             self.imgs_out=self.graph_out
+
+    def update_graph_multiply(self, data):
         if self.hide_graph: return
-        if x_bounds is None: x_bounds = [None]*len(graphs)
-        if y_bounds is None: y_bounds = [None]*len(graphs)
         if not self.multiply_graph_set:
             print('please set mltiply graph first')
             raise NotImplementedError
         if not hasattr(self, 'graph_out'):
-            self.graph_out = display(self.graph_axes[0].figure, display_id=True)
+            self.graph_out = display(self.graph_axes[0][0].figure, display_id=True)
             self.imgs_out=self.graph_out
-        if len(self.names) < len(graphs): self.names += [['total']]
-        for i,graph in enumerate(graphs):
-        #for graph,name,graph_ax in zip(graphs,self.names,self.graph_axes):
-            name     = self.names[i]
-            graph_ax = self.graph_axes[i]
-            x_bound  = x_bounds[i]
-            y_bound  = y_bounds[i]
-            graph_ax.clear()
-            if len(name) < len(graph): name += [''] * (len(graph) - len(name))
-            for g,n in zip(graph,name): graph_ax.plot(*g, label=n)
-            graph_ax.legend(loc='upper right')
-            if x_bound is not None: graph_ax.set_xlim(*x_bound)
-            if y_bound is not None: graph_ax.set_ylim(*y_bound)
-        self.graph_out.update(self.graph_axes[0].figure)
-
+        graph_axes=self.graph_axes
+        if not isinstance(self.graph_axes,list):
+            if isinstance(self.graph_axes,np.ndarray):graph_axes=[self.graph_axes]
+            else:graph_axes=[[self.graph_axes]]
+        for i,axes_row in enumerate(self.graph_axes):
+            for j, ax in enumerate(axes_row):
+                ax.clear()
+                d  = data[i][j]
+                e  = self.engine[i][j]
+                if e == 'plot': ax.plot(range(len(d)),d)
+                elif e == 'imshow':
+                    ax.imshow(d,cmap='hot',vmin=0, vmax=1)
+                    ax.set_xticks(())
+                    ax.set_yticks(())
+                elif e == 'multiplot':
+                    for line in d:ax.plot(range(len(line)),line)
+                else:
+                    raise NotImplementedError
+        self.graph_out.update(ax.figure)
 magic_char = "\033[F"
 import sys
 def multi_print_line(content, num=2,offset=0):

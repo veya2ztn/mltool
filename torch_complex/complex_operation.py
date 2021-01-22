@@ -31,7 +31,8 @@ def complex_mm(tensor_1: torch.Tensor,tensor_2: torch.Tensor,mode='cc')-> torch.
         assert tensor_2.shape[-1]==2
         real1,imag1=tensor_1[...,0],tensor_1[...,1]
         real2,imag2=tensor_2[...,0],tensor_2[...,1]
-        return torch.stack([real1.mm(real2) - imag1.mm(imag2), real1.mm(imag2) + imag1.mm(real2)], dim = -1)
+        return  torch.stack([torch.matmul(real1, real2) - torch.matmul(imag1, imag2),
+                             torch.matmul(real1, imag2) + torch.matmul(imag1, real2)], dim = -1)
     elif mode=='cr':
         assert tensor_1.shape[-1]==2
         real1,imag1=tensor_1[...,0],tensor_1[...,1]

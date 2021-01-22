@@ -3,6 +3,7 @@ from sys import stdout
 from warnings import warn
 import shutil,os
 import tqdm
+import numpy as np
 
 #__all__ = ['master_bar', 'progress_bar', 'IN_NOTEBOOK']
 
@@ -285,7 +286,7 @@ class NBMasterBar(MasterBar):
         if y_bounds is not None: self.graph_ax.set_ylim(*y_bounds)
         self.graph_out.update(self.graph_ax.figure)
 
-    def set_multiply_graph(self,nrows=1,ncols=2, engine=None, figsize=(6,4)):
+    def set_multiply_graph(self,nrows=1,ncols=2, engine=None, labels=None,figsize=(6,4)):
         # engine demo [[plot,imshow],[plot,imshow]]
         if engine is None:
             engine = [['plot']*ncols]*nrows
@@ -303,13 +304,9 @@ class NBMasterBar(MasterBar):
             graph_axes=np.array([[graph_axes]])
         self.graph_axes = graph_axes
         self.engine     = engine
-#         if not hasattr(self, 'graph_out'):
-#             if isinstance(self.graph_axes,list):
-#                 ax = self.graph_axes.flatten()[0]
-#             else:
-#                 ax = self.graph_axes
-#             self.graph_out = display(ax.figure, display_id=True)
-#             self.imgs_out=self.graph_out
+        self.labels     = labels
+        self.graph_out = display(self.graph_axes[0][0].figure, display_id=True)
+        self.imgs_out=self.graph_out
 
     def update_graph_multiply(self, data):
         if self.hide_graph: return
@@ -328,6 +325,7 @@ class NBMasterBar(MasterBar):
                 ax.clear()
                 d  = data[i][j]
                 e  = self.engine[i][j]
+
                 if e == 'plot': ax.plot(range(len(d)),d)
                 elif e == 'imshow':
                     ax.imshow(d,cmap='hot',vmin=0, vmax=1)
@@ -337,6 +335,9 @@ class NBMasterBar(MasterBar):
                     for line in d:ax.plot(range(len(line)),line)
                 else:
                     raise NotImplementedError
+                if self.labels is not None:
+                    t  = self.labels[i][j]
+                    ax.set_title(t)
         self.graph_out.update(ax.figure)
 magic_char = "\033[F"
 import sys

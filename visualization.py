@@ -1,4 +1,5 @@
-import cv2
+try:import cv2
+except:pass
 from PIL import Image, ImageOps, ImageStat, ImageDraw
 from scipy.stats import gaussian_kde
 import matplotlib

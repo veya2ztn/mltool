@@ -12,7 +12,7 @@ def sendall2gpu(listinlist,device):
             out.append(sendall2gpu(_list,device))
         return out
     else:
-        return listinlist.float().to(device=device, non_blocking=True)
+        return listinlist.to(device=device, non_blocking=True)
 try:
     from prefetch_generator import BackgroundGenerator
     class DataLoaderX(DataLoader):

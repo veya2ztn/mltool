@@ -73,7 +73,7 @@ class infinite_batcher:
         self.now=-1
         self.data_loader= data_loader
         self.prefetcher = None
-        self.device     = 'device'
+        self.device     = device
     def next(self):
         if (self.now >= self.length) or (self.now == -1):
             if self.prefetcher is not None:del self.prefetcher

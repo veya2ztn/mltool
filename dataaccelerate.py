@@ -66,3 +66,17 @@ class DataPrefetcher():
         batch = self.batch
         self.preload()
         return batch
+
+class infinite_batcher:
+    def __init__(self,data_loader):
+        self.length=len(data_loader)
+        self.now=-1
+        self.data_loader=data_loader
+        self.prefetcher = None
+    def next(self):
+        if (self.now >= self.length) or (self.now == -1):
+            if self.prefetcher is not None:del self.prefetcher
+            self.prefetcher = DataSimfetcher(self.data_loader)
+            self.now=0
+        self.now+=1
+        return self.prefetcher.next()

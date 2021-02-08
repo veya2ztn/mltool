@@ -336,3 +336,25 @@ def dataframe(df, **kwargs):
         A pandas DataFrame with the table to print
     """
     table(df.values, list(df.columns), **kwargs)
+
+class summary_table_info:
+    def __init__(self,headers,title,rows=1):
+        self.headers = headers
+        self.title   = title
+        self.width   = [len(t)+2 for t in headers]
+        self.rows    = rows
+    def demo(self):
+        headers = self.headers
+        title   = self.title
+        data    = [[0 for i in headers] for i in range(self.rows)]
+        widths  = self.width
+        content = tablist(data,headers,title=title,width=widths)
+
+        content = "\n".join(content)
+        return content
+    def show(self,data,title=None):
+        title = self.title if title is None else title
+        headers = self.headers
+        widths  = self.width
+        content = tablist(data,headers,title=title,width=widths)
+        return content

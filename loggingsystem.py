@@ -23,7 +23,7 @@ class LoggingSystem:
         self.master_bar = self.train_bar = self.valid_bar  = None
         self.train_recorder = self.valid_recorder = None
         self.gpu_now    = gpu
-
+        self.global_step= None
         if verbose:print(f"log at {ckpt_root}")
 
     def train(self):

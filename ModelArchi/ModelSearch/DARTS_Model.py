@@ -271,8 +271,9 @@ class Network(nn.Module):
 
     def genotype(self,use_Zero_layer=False):
         assert self.arch_searchQ
-        gene =OrderedDict()
+        gene      =OrderedDict()
         gen_weight=OrderedDict()
+
         structure_config = []
         gen_weight['stem']= self.stem.state_dict()
         for i, cell in enumerate(self.cells):
@@ -332,4 +333,10 @@ class Network(nn.Module):
                     if isinstance(ops_dict,torch.Tensor):continue
                     for op_name,op_weight in ops_dict.items():
                         gene_str+='\n'+prefix+f'node_{node_map(in_node)} to node_{current_node}:{op_name}'
-        return structure_config,gene_str,gen_weight
+
+        structure_config_dict = {}
+        structure_config_dict['_C']          = self._C
+        structure_config_dict['_num_classes']= self._num_classes
+        structure_config_dict['_layers']     = self._layers
+        structure_config_dict['config']      = structure_config
+        return structure_config_dict,gene_str,gen_weight

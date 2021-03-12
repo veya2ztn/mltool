@@ -22,6 +22,7 @@ except:
     DataLoaderX = DataLoader
 class DataSimfetcher():
     def __init__(self, loader, device='auto'):
+    
         if device == 'auto':
             self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         else:
@@ -30,6 +31,7 @@ class DataSimfetcher():
 
     def next(self):
         try:
+
             self.batch = next(self.loader)
             self.batch = sendall2gpu(self.batch,self.device)
         except StopIteration:

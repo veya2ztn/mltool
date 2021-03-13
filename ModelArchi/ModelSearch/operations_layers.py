@@ -1,6 +1,50 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.nn.modules.batchnorm import _BatchNorm
 
+class AdaptiveBatchNorm2d(_BatchNorm):
+    def _check_input_dim(self, input):
+        if input.dim() != 4:
+            raise ValueError('expected 4D input (got {}D input)' .format(input.dim()))
+    def forward(self, input):
+        self._check_input_dim(input)
+        if input.shape[-1]==1:
+            return input
+
+        # exponential_average_factor is set to self.momentum
+        # (when it is available) only so that it gets updated
+        # in ONNX graph when this node is exported to ONNX.
+        if self.momentum is None:exponential_average_factor = 0.0
+        else:exponential_average_factor = self.momentum
+
+        if self.training and self.track_running_stats:
+            # TODO: if statement only here to tell the jit to skip emitting this when it is None
+            if self.num_batches_tracked is not None:
+                self.num_batches_tracked = self.num_batches_tracked + 1
+                if self.momentum is None:  # use cumulative moving average
+                    exponential_average_factor = 1.0 / float(self.num_batches_tracked)
+                else:  # use exponential moving average
+                    exponential_average_factor = self.momentum
+
+        r"""
+        Decide whether the mini-batch stats should be used for normalization rather than the buffers.
+        Mini-batch stats are used in training mode, and in eval mode when buffers are None.
+        """
+        if self.training:bn_training = True
+        else:bn_training = (self.running_mean is None) and (self.running_var is None)
+
+        r"""
+        Buffers are only updated if they are to be tracked and we are in training mode. Thus they only need to be
+        passed when the update should occur (i.e. in training mode when they are tracked), or when buffer stats are
+        used for normalization (i.e. in eval mode when buffers are not None).
+        """
+        return F.batch_norm(
+            input,
+            # If buffers are not to be tracked, ensure that they won't be updated
+            self.running_mean if not self.training or self.track_running_stats else None,
+            self.running_var if not self.training or self.track_running_stats else None,
+            self.weight, self.bias, bn_training, exponential_average_factor, self.eps)
 
 class ReLUcclConvBN(nn.Module):
     def __init__(self, C_in, C_out, k, s, d, circularQ=True,affine=True):
@@ -11,7 +55,7 @@ class ReLUcclConvBN(nn.Module):
         self.op = nn.Sequential(
           nn.ReLU(inplace=False),
           nn.Conv2d(C_in, C_out, k, stride=s, padding=pp,dilation=d, bias=False,padding_mode="circular" if circularQ else 'zeros'),
-          nn.BatchNorm2d(C_out, affine=affine)
+          AdaptiveBatchNorm2d(C_out, affine=affine)
         )
 
     def forward(self, x):
@@ -34,7 +78,7 @@ class ReLUConvBN(nn.Module):
     self.op = nn.Sequential(
       nn.ReLU(inplace=False),
       nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
-      nn.BatchNorm2d(C_out, affine=affine)
+      AdaptiveBatchNorm2d(C_out, affine=affine)
     )
 
   def forward(self, x):
@@ -47,7 +91,7 @@ class DilConv(nn.Module):
       nn.ReLU(inplace=False),
       nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=C_in, bias=False),
       nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
-      nn.BatchNorm2d(C_out, affine=affine),
+      AdaptiveBatchNorm2d(C_out, affine=affine),
       )
 
   def forward(self, x):
@@ -60,11 +104,11 @@ class SepConv(nn.Module):
       nn.ReLU(inplace=False),
       nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, groups=C_in, bias=False),
       nn.Conv2d(C_in, C_in, kernel_size=1, padding=0, bias=False),
-      nn.BatchNorm2d(C_in, affine=affine),
+      AdaptiveBatchNorm2d(C_in, affine=affine),
       nn.ReLU(inplace=False),
       nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=1, padding=padding, groups=C_in, bias=False),
       nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
-      nn.BatchNorm2d(C_out, affine=affine),
+      AdaptiveBatchNorm2d(C_out, affine=affine),
       )
 
   def forward(self, x):
@@ -90,7 +134,7 @@ class FactorizedReduce(nn.Module):
     self.relu = nn.ReLU(inplace=False)
     self.conv_1 = nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False)
     self.conv_2 = nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False)
-    self.bn = nn.BatchNorm2d(C_out, affine=affine)
+    self.bn = AdaptiveBatchNorm2d(C_out, affine=affine)
 
   def forward(self, x):
     x = self.relu(x)

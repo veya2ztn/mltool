@@ -6,7 +6,7 @@ import numpy as np
 from collections import OrderedDict
 
 from .operations_define import MSOPS,MSOPS_NO,NORMALSIZE,REDUCESIZE,get_OPs_for
-from .operations_layers import ReLUConvBN,FactorizedReduce
+from .operations_layers import ReLUConvBN,FactorizedReduce,AdaptiveBatchNorm2d
 
 def channel_shuffle(x, groups):
     batchsize, num_channels, height, width = x.data.size()
@@ -39,8 +39,7 @@ class MixedOp(nn.Module):
             if C <  self.k:C_in = self.k
             else:C_in = C // self.k
             op = operation_candidate[primitive](C_in, stride, False)
-            if 'pool' in primitive:
-                op = nn.Sequential(op, nn.BatchNorm2d(C_in, affine=False))
+            if 'pool' in primitive:op = nn.Sequential(op, AdaptiveBatchNorm2d(C_in, affine=False))
             if operation_weight is not None:
                 # print(f"assign layer {primitive} in"),
                 # print(operation_weight.keys())
@@ -69,7 +68,9 @@ class MixedOp(nn.Module):
             xtemp2 = x[:,  dim_2 // self.k:, :, :]
             temp1=0
             if weights is not None:
-                for w, op in zip(weights, self._ops):temp1 += w.to(x.device) * op(xtemp)
+                for w, op in zip(weights, self._ops):
+                    temp1 += w.to(x.device) * op(xtemp)
+                    
             else:
                 for op in self._ops:temp1 += op(xtemp)
 
@@ -86,150 +87,151 @@ class MixedOp(nn.Module):
 
 class Cell(nn.Module):
 
-    def __init__(self, steps, multiplier, C_prev_prev, C_prev, C, reduction, reduction_prev, input_dim,
-                 operation_candidate,operation_config=None,operation_weight=None,withbasic=True):
+    def __init__(self, C_prev_prev, C_prev, C_curr, reduction, reduction_prev, input_dim,operation_candidate,
+                       operation_config=None,operation_weight=None,withbasic=True,nodes=4):
         super(Cell, self).__init__()
         self.reduction   = reduction
+        self.C_prev_prev = C_prev_prev
+        self.C_prev      = C_prev
+        self.C_curr      = C_curr*2 if reduction else C_curr
+        self.output_dim  = input_dim // 2 if reduction else input_dim
         self.input_dim   = input_dim
-        self.preprocess0 = FactorizedReduce(C_prev_prev, C, affine=False) if reduction_prev else \
-                           ReLUConvBN(C_prev_prev, C, 1, 1, 0, affine=False)
-        self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0, affine=False)
+        self._nodes      = nodes
+        self.preprocess0 = FactorizedReduce(self.C_prev_prev, self.C_curr, affine=False) if reduction_prev else \
+                           ReLUConvBN(self.C_prev_prev, self.C_curr, 1, 1, 0, affine=False)
+        self.preprocess1 = ReLUConvBN(self.C_prev, self.C_curr, 1, 1, 0, affine=False)
         if operation_weight is not None:
             self.preprocess0.load_state_dict(operation_weight['preprocess0'])
             self.preprocess1.load_state_dict(operation_weight['preprocess1'])
-        self._steps      = steps
-        self._nodes      = steps
-        self._multiplier = multiplier
-        self._ops        = nn.ModuleList()
-        self._map        = []
-        self.in_index    = []
+
         ## below is search mode:
         ### for each edge, we get #op options.
-        self.betas_mask  = nn.Parameter(torch.FloatTensor(self._nodes, self._nodes+2).fill_(-np.inf),requires_grad=False)
-
         if operation_config is None:
             # initialize a default search config
             self.in_index        = [list(range(2 + node_order)) for node_order in range(self._nodes)]
             self.operation_config = [[None for i in in_index_of_this_node] for in_index_of_this_node in self.in_index]
             # if #node==4, default operation [[None,None],[None,None,None],[None,None,None,None],[None,None,None,None,None]]
         else:
-            self.in_index        = operation_config[0]
+            self.in_index         = operation_config[0]
             self.operation_config = operation_config[1]
         #print(self.reduction)
-
+        self.C_out       = 0
+        self._ops        = nn.ModuleList()
+        self.betas_mask  = nn.Parameter(torch.FloatTensor(self._nodes, self._nodes+2).fill_(-np.inf),requires_grad=False)
         for current_node,(in_nodes,edge_types) in enumerate(zip(self.in_index,self.operation_config)):
             # print(f"--layer{current_node}")
             # print(edge_types)
-            sub_map = []
+            active_cell = 0
             for in_node,edge_type in zip(in_nodes,edge_types):
+                #print(f"-- {current_node}-->{in_node}:{C_curr}")
+                if edge_type == "none":continue
+                else:active_cell = 1
                 stride = 2 if reduction and in_node < 2 else 1 #when do reduction, only the first two edge "a->x" or "b->x" do.
                 if edge_type is None:
                     operation_choose = get_OPs_for(input_dim,stride,withbasic=withbasic)
                     operation_weight_for_this_choose = None
                 else:
-                    if isinstance(edge_type,list):operation_choose = edge_type
-                    else:operation_choose = [edge_type]
-                    if operation_weight is not None:
-                        operation_weight_for_this_choose = operation_weight[current_node][in_node]
-                    else:
-                        operation_weight_for_this_choose = None
+                    operation_choose = edge_type if isinstance(edge_type,list) else [edge_type]
+                    operation_weight_for_this_choose = operation_weight[current_node][in_node] if operation_weight is not None else None
                 #print(f'----node_{node_map(in_node)} to node_{current_node}')
                 #print(f"{in_node}->{current_node} s:{stride} type:{edge_type}")
                 # edge_type == None mean we do search job
                 # when we search the arch, this operation is a mixed opteration with extrernal distribution input (shared memory stratagy)
                 # we can also give the operation after we finish the search by only give one choose
-                op = MixedOp(C, stride, input_dim,operation_choose   =operation_choose,
-                                                  operation_weight   =operation_weight_for_this_choose,
-                                                  operation_candidate=operation_candidate[stride])
-
+                op = MixedOp(self.C_curr, stride, input_dim, operation_choose   =operation_choose,
+                                                             operation_weight   =operation_weight_for_this_choose,
+                                                             operation_candidate=operation_candidate[stride])
                 self._ops.append(op)
                 self.betas_mask[current_node,in_node]=0
-                sub_map.append(op._op_ids)
-            self._map.append(sub_map)
+            if active_cell:self.C_out+=self.C_curr
+
         # not every operation will be available due to the image size,
         # for example Conv2d(k=16) is not available for (8,8) image
         ## if we use search mode, the alphas_mask is a tensor [#edge, #options]
         ## if we use fix model mode, the alphas_mask should be 0 or [#edge,1]
+
         operation_num_per_edge = REDUCESIZE if reduction else NORMALSIZE
         self.alphas_mask = nn.Parameter(torch.FloatTensor(len(self._ops), operation_num_per_edge).fill_(-np.inf),requires_grad=False)
         for edge_id,op in enumerate(self._ops):self.alphas_mask[edge_id,op._op_ids]=0
+
     def forward(self, s0, s1, weights1, weights2):
         s0 = self.preprocess0(s0)# node 0 AKA node 'a'
         s1 = self.preprocess1(s1)# node 1 AKA node 'b'
         states = [s0, s1]
         offset = 0
-        for in_index_of_this_node in self.in_index:# default:[[0,1],[0,1,2],[0,1,2,3],[0,1,2,3,4]]
+        for current_node,in_index_of_this_node in enumerate(self.in_index):# default:[[0,1],[0,1,2],[0,1,2,3],[0,1,2,3,4]]
             s=0
             for j,in_index in enumerate(in_index_of_this_node):
+                if self.operation_config[current_node][j]=='none':continue
                 edge_id = offset+j # from the serialize weights to the right one
                 h = states[in_index]
                 if weights1 is not None:
                     s += weights2[edge_id].to(h.device)*self._ops[edge_id](h, weights1[edge_id].to(h.device))
+
                 else:
-                    s += self._ops[edge_id](states[in_index])
+                    s += self._ops[edge_id](h)
             offset += len(in_index_of_this_node)
             states.append(s)
-        return torch.cat(states[-self._multiplier:], dim=1)
+        return torch.cat(states[2:], dim=1)
 
 
 class Network(nn.Module):
 
-    def __init__(self, C, num_classes, layers, input_dim=16, shrink_layer_index=None,
-                       steps=4, multiplier=4, stem_multiplier=2, circularQ = True,withbasic=True,
-                        operation_config=None,operation_weight=None):
+    def __init__(self, C=16, num_classes=2, layers=8,input_dim=16, shrink_layer_index=None,nodes=4, stem_multiplier=2,
+                        circularQ = True,withbasic=True,operation_config=None,operation_weight=None):
         super(Network, self).__init__()
-        self._C           = C
-        self._num_classes = num_classes
-        self._layers      = layers
-        self._steps       = steps
-        self._multiplier  = multiplier
-        self.input_dim    = input_dim
-        self._shrink_layer_index = [layers // 3, 2 * layers // 3] if shrink_layer_index is None else shrink_layer_index
+        self.model_config               = {}
+        self.model_config["C"]          =self._C                  = C
+        self.model_config["nodes"]      =self._nodes              = nodes
+        self.model_config["layers"]     =self._layers             = layers
+        self.model_config["input_dim"]  =self.input_dim           = input_dim
+        self.model_config["circularQ"]  =self.circularQ           = circularQ
+        self.model_config["withbasic"]  =self.withbasic           = withbasic
+        self.model_config["num_classes"]=self._num_classes        = num_classes
+        self.model_config["stem_multiplier"]   =self.stem_multiplier     = stem_multiplier
+        self.model_config["shrink_layer_index"]=self._shrink_layer_index = [layers // 3, 2 * layers // 3] if shrink_layer_index is None else shrink_layer_index
 
         C_curr = stem_multiplier * C
+
         self.stem = nn.Sequential(
             nn.Conv2d(1, C_curr, 3, padding=1, bias=False),  # (B,C,16,16)
             nn.BatchNorm2d(C_curr)
         )
+        C_prev_prev, C_prev,C_curr,reduction_prev,input_dim = C_curr, C_curr,C , False,input_dim
 
-        C_prev_prev, C_prev, C_curr = C_curr, C_curr, C
-        self.cells = nn.ModuleList()
-        reduction_prev = False
-        self._map      = []
-        self.arch_searchQ = operation_config is None
+
+        self.cells          = nn.ModuleList()
+        self.arch_searchQ   = operation_config is None
         operation_candidate = MSOPS if circularQ else MSOPS_NO
         for i in range(layers):
             # for this layer we shrink the size and double the chennels
-            if i in self._shrink_layer_index:
-                C_curr *= 2
-                reduction = True
-            else:
-                reduction = False
+            reduction = True if i in self._shrink_layer_index else False
             operation_config_for_this_cell = None if operation_config is None else operation_config[i]
             cell_name=f"cell_{i}(reduce)" if reduction else f"cell_{i}(normal)"
+            #print(cell_name)
             operation_weight_for_this_cell = None if operation_weight is None else operation_weight[cell_name]
             # cell_operation
             # normal layer: the dim for image will not change (B,C,X,X) -> (B,C,X,X)
             # reduce layer: the dim for image will be half    (B,C,X,X) -> (B,2C,X/2,X/2)
             #print(f"-{cell_name}")
-            cell = Cell(steps, multiplier, C_prev_prev, C_prev,C_curr, reduction, reduction_prev, input_dim,
-                        operation_candidate,operation_config=operation_config_for_this_cell,
-                        operation_weight=operation_weight_for_this_cell,withbasic=withbasic)
+            cell = Cell(C_prev_prev, C_prev, C_curr, reduction, reduction_prev, input_dim,operation_candidate,
+                        operation_config=operation_config_for_this_cell,
+                        operation_weight=operation_weight_for_this_cell,
+                        withbasic=withbasic,
+                        nodes=nodes)
+            self.cells.append(cell)
 
-            self._map.append(cell._map)
             if reduction:
                 self.alpha_shape_reduce    = cell.alphas_mask.shape
                 self.betas_shape_reduce    = cell.betas_mask.shape
             else:
                 self.alpha_shape_normal    = cell.alphas_mask.shape
                 self.betas_shape_normal    = cell.betas_mask.shape
-            input_dim = input_dim // 2 if reduction else input_dim
-            reduction_prev = reduction
-            self.cells.append(cell)
-            C_prev_prev, C_prev = C_prev, multiplier * C_curr
+
+            C_prev_prev, C_prev,C_curr,reduction_prev,input_dim = cell.C_prev, cell.C_out, cell.C_curr,cell.reduction,cell.output_dim
 
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
-        self.classifier = nn.Linear(C_prev, num_classes)
+        self.classifier     = nn.Linear(C_prev, num_classes)
 
         if self.arch_searchQ:self._initialize_alphas()
 
@@ -335,8 +337,6 @@ class Network(nn.Module):
                         gene_str+='\n'+prefix+f'node_{node_map(in_node)} to node_{current_node}:{op_name}'
 
         structure_config_dict = {}
-        structure_config_dict['_C']          = self._C
-        structure_config_dict['_num_classes']= self._num_classes
-        structure_config_dict['_layers']     = self._layers
-        structure_config_dict['config']      = structure_config
+        structure_config_dict['model_config']     = self.model_config
+        structure_config_dict['config']           = structure_config
         return structure_config_dict,gene_str,gen_weight

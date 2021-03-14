@@ -11,7 +11,7 @@ def config_list(size,stride):
             record.append([p//1,d//1,k])
     return  record
 
-def get_OPs_for(input_dim,stride,withbasic=True):
+def get_OPs_for(input_dim,stride,withbasic=True,circularQ=True):
     if input_dim is None:input_dim  = MAXSIZE
     s      = stride
     cl     = config_list(input_dim,stride)
@@ -19,7 +19,7 @@ def get_OPs_for(input_dim,stride,withbasic=True):
         names  = [n for n in BasicOPS.keys()]
     else:
         names  = ['none', 'avg_pool_3x3','max_pool_3x3','skip_connect',]
-    for p,d,k in config_list(input_dim,stride):names.append(MSNAMERULE(k,d,s,p))
+    for p,d,k in config_list(input_dim,stride):names.append(MSNAMERULE(k,d,s,p,circularQ))
     return names
 
 ### all permitted operation list here
@@ -36,18 +36,19 @@ OPS=BasicOPS =  {
   }
 
 MAXSIZE = 16
-MSNAMERULE=lambda k,d,s,p:f"circular_conv_k{k}_s{s}_d{d}_p{p}"
+MSNAMERULE=lambda k,d,s,p,c:f"circular_conv_k{k}_s{s}_d{d}_p{p}" if c else f"simple_conv_k{k}_s{s}_d{d}_p{p}"
 MSOPS={}
 for s in [1,2]:
     MSOPS[s]=BasicOPS.copy()
     for p,d,k in config_list(16,s):
-        MSOPS[s][MSNAMERULE(k,d,s,p)]=ReLUcclConvBNWrapper(k,s,d,True)
+        MSOPS[s][MSNAMERULE(k,d,s,p,True)]=ReLUcclConvBNWrapper(k,s,d,True)
 
 MSOPS_NO={}
 for s in [1,2]:
     MSOPS_NO[s]=BasicOPS.copy()
     for p,d,k in config_list(16,s):
-        MSOPS_NO[s][MSNAMERULE(k,d,s,p)]=ReLUcclConvBNWrapper(k,s,d,False)
+        MSOPS_NO[s][MSNAMERULE(k,d,s,p,False)]=ReLUcclConvBNWrapper(k,s,d,False)
+
 NORMALSIZE = len(MSOPS[1])
 REDUCESIZE = max(len(MSOPS[1]),len(MSOPS[2]))
 

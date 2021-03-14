@@ -70,7 +70,7 @@ class MixedOp(nn.Module):
             if weights is not None:
                 for w, op in zip(weights, self._ops):
                     temp1 += w.to(x.device) * op(xtemp)
-                    
+
             else:
                 for op in self._ops:temp1 += op(xtemp)
 
@@ -88,7 +88,7 @@ class MixedOp(nn.Module):
 class Cell(nn.Module):
 
     def __init__(self, C_prev_prev, C_prev, C_curr, reduction, reduction_prev, input_dim,operation_candidate,
-                       operation_config=None,operation_weight=None,withbasic=True,nodes=4):
+                       operation_config=None,operation_weight=None,withbasic=True,circularQ=True,nodes=4):
         super(Cell, self).__init__()
         self.reduction   = reduction
         self.C_prev_prev = C_prev_prev
@@ -112,23 +112,24 @@ class Cell(nn.Module):
             self.operation_config = [[None for i in in_index_of_this_node] for in_index_of_this_node in self.in_index]
             # if #node==4, default operation [[None,None],[None,None,None],[None,None,None,None],[None,None,None,None,None]]
         else:
-            self.in_index         = operation_config[0]
-            self.operation_config = operation_config[1]
+            self.in_index         = [[in_node   for in_node,edge_type in zip(in_nodes,edge_types) if ((edge_type != "none") or reduction)]
+                                                for in_nodes,edge_types in zip(operation_config[0],operation_config[1])]
+            self.operation_config = [[edge_type for in_node,edge_type in zip(in_nodes,edge_types) if ((edge_type != "none") or reduction)]
+                                                for in_nodes,edge_types in zip(operation_config[0],operation_config[1])]
         #print(self.reduction)
         self.C_out       = 0
         self._ops        = nn.ModuleList()
         self.betas_mask  = nn.Parameter(torch.FloatTensor(self._nodes, self._nodes+2).fill_(-np.inf),requires_grad=False)
+        # filte operation_config
         for current_node,(in_nodes,edge_types) in enumerate(zip(self.in_index,self.operation_config)):
             # print(f"--layer{current_node}")
             # print(edge_types)
-            active_cell = 0
+            if len(in_nodes)==0:continue
             for in_node,edge_type in zip(in_nodes,edge_types):
                 #print(f"-- {current_node}-->{in_node}:{C_curr}")
-                if edge_type == "none":continue
-                else:active_cell = 1
                 stride = 2 if reduction and in_node < 2 else 1 #when do reduction, only the first two edge "a->x" or "b->x" do.
                 if edge_type is None:
-                    operation_choose = get_OPs_for(input_dim,stride,withbasic=withbasic)
+                    operation_choose = get_OPs_for(input_dim,stride,withbasic=withbasic,circularQ=circularQ)
                     operation_weight_for_this_choose = None
                 else:
                     operation_choose = edge_type if isinstance(edge_type,list) else [edge_type]
@@ -143,7 +144,7 @@ class Cell(nn.Module):
                                                              operation_candidate=operation_candidate[stride])
                 self._ops.append(op)
                 self.betas_mask[current_node,in_node]=0
-            if active_cell:self.C_out+=self.C_curr
+            self.C_out+=self.C_curr
 
         # not every operation will be available due to the image size,
         # for example Conv2d(k=16) is not available for (8,8) image
@@ -160,14 +161,13 @@ class Cell(nn.Module):
         states = [s0, s1]
         offset = 0
         for current_node,in_index_of_this_node in enumerate(self.in_index):# default:[[0,1],[0,1,2],[0,1,2,3],[0,1,2,3,4]]
+            if len(in_index_of_this_node)==0:continue
             s=0
             for j,in_index in enumerate(in_index_of_this_node):
-                if self.operation_config[current_node][j]=='none':continue
                 edge_id = offset+j # from the serialize weights to the right one
                 h = states[in_index]
                 if weights1 is not None:
                     s += weights2[edge_id].to(h.device)*self._ops[edge_id](h, weights1[edge_id].to(h.device))
-
                 else:
                     s += self._ops[edge_id](h)
             offset += len(in_index_of_this_node)
@@ -217,7 +217,7 @@ class Network(nn.Module):
             cell = Cell(C_prev_prev, C_prev, C_curr, reduction, reduction_prev, input_dim,operation_candidate,
                         operation_config=operation_config_for_this_cell,
                         operation_weight=operation_weight_for_this_cell,
-                        withbasic=withbasic,
+                        withbasic=withbasic,circularQ=circularQ,
                         nodes=nodes)
             self.cells.append(cell)
 

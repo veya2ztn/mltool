@@ -45,10 +45,11 @@ class MixedOp(nn.Module):
                 # print(operation_weight.keys())
                 # print()
                 op.load_state_dict(operation_weight[primitive])
+            op.name = primitive
             self._ops.append(op)
             self._op_ids.append(list(operation_candidate.keys()).index(primitive))
 
-    def forward(self, x, weights_full=None):
+    def forward(self, x, weights_full=None,pruning_ops=None):
         weights = weights_full[weights_full>0] if weights_full is not None else None
         assert  (weights is None) or (len(weights) == len(self._ops))
 
@@ -59,9 +60,15 @@ class MixedOp(nn.Module):
         if dim_2 < self.k:
             temp1=0
             if weights is not None:
-                for w, op in zip(weights, self._ops):temp1 += w.to(x.device) * op(x)
+                for w, op in zip(weights, self._ops):
+                    temp1 += w.to(x.device) * op(x)
             else:
-                for op in self._ops:temp1 += op(x)
+                if pruning_ops is None: # not use pruning mode
+                    for op in self._ops:temp1 += op(x)
+                else:
+                    for op in self._ops:
+                        if op.name != pruning_ops:continue
+                        temp1 += op(x)
             return temp1
         else:
             xtemp = x[:, :  dim_2 // self.k, :, :]
@@ -70,12 +77,12 @@ class MixedOp(nn.Module):
             if weights is not None:
                 for w, op in zip(weights, self._ops):
                     temp1 += w.to(x.device) * op(xtemp)
-
             else:
-                for op in self._ops:temp1 += op(xtemp)
-
+                for op in self._ops:
+                    if (pruning_ops is not None) and (op.name != pruning_ops):continue
+                    temp1 += op(xtemp)
             # reduction cell needs pooling before concat
-            if temp1.shape[2] == x.shape[2]:
+            if temp1.shape[-2] == x.shape[-2]:
                 ans = torch.cat([temp1, xtemp2], dim=1)
             else:
                 ans = torch.cat([temp1, self.mp(xtemp2)], dim=1)
@@ -116,14 +123,17 @@ class Cell(nn.Module):
                                                 for in_nodes,edge_types in zip(operation_config[0],operation_config[1])]
             self.operation_config = [[edge_type for in_node,edge_type in zip(in_nodes,edge_types) if ((edge_type != "none") or reduction)]
                                                 for in_nodes,edge_types in zip(operation_config[0],operation_config[1])]
+
         #print(self.reduction)
         self.C_out       = 0
         self._ops        = nn.ModuleList()
+        self.edge_map    = {}
         self.betas_mask  = nn.Parameter(torch.FloatTensor(self._nodes, self._nodes+2).fill_(-np.inf),requires_grad=False)
         # filte operation_config
         for current_node,(in_nodes,edge_types) in enumerate(zip(self.in_index,self.operation_config)):
             # print(f"--layer{current_node}")
             # print(edge_types)
+            self.edge_map[current_node] = {}
             if len(in_nodes)==0:continue
             for in_node,edge_type in zip(in_nodes,edge_types):
                 #print(f"-- {current_node}-->{in_node}:{C_curr}")
@@ -142,7 +152,10 @@ class Cell(nn.Module):
                 op = MixedOp(self.C_curr, stride, input_dim, operation_choose   =operation_choose,
                                                              operation_weight   =operation_weight_for_this_choose,
                                                              operation_candidate=operation_candidate[stride])
+
                 self._ops.append(op)
+                self.edge_map[current_node][in_node] = len(self._ops)-1
+
                 self.betas_mask[current_node,in_node]=0
             self.C_out+=self.C_curr
 
@@ -159,18 +172,17 @@ class Cell(nn.Module):
         s0 = self.preprocess0(s0)# node 0 AKA node 'a'
         s1 = self.preprocess1(s1)# node 1 AKA node 'b'
         states = [s0, s1]
-        offset = 0
         for current_node,in_index_of_this_node in enumerate(self.in_index):# default:[[0,1],[0,1,2],[0,1,2,3],[0,1,2,3,4]]
             if len(in_index_of_this_node)==0:continue
             s=0
             for j,in_index in enumerate(in_index_of_this_node):
-                edge_id = offset+j # from the serialize weights to the right one
+                edge_id = self.edge_map[current_node][in_index] # from the serialize weights to the right one
                 h = states[in_index]
                 if weights1 is not None:
                     s += weights2[edge_id].to(h.device)*self._ops[edge_id](h, weights1[edge_id].to(h.device))
                 else:
-                    s += self._ops[edge_id](h)
-            offset += len(in_index_of_this_node)
+                    pruning_ops=self.operation_config[current_node][j]
+                    s += self._ops[edge_id](h,pruning_ops=pruning_ops)
             states.append(s)
         return torch.cat(states[2:], dim=1)
 
@@ -271,7 +283,7 @@ class Network(nn.Module):
     def arch_parameters(self):
         return self._arch_parameters
 
-    def genotype(self,use_Zero_layer=False):
+    def genotype(self,use_Zero_layer=False,plotweight=False):
         assert self.arch_searchQ
         gene      =OrderedDict()
         gen_weight=OrderedDict()
@@ -339,4 +351,47 @@ class Network(nn.Module):
         structure_config_dict = {}
         structure_config_dict['model_config']     = self.model_config
         structure_config_dict['config']           = structure_config
+
+
         return structure_config_dict,gene_str,gen_weight
+
+    def get_structure_weight_detail(save_path = None):
+        graph_fig, graph_axes = plt.subplots(nrows=14, ncols=8, figsize=(4*8*1.5,1*14*1.5))
+        for i, cell in enumerate(self.cells):
+            ax_list = graph_axes[:,i]
+
+            weights1_full = F.softmax(self.alphas_reduce+ cell.alphas_mask, dim=-1) if cell.reduction else \
+                            F.softmax(self.alphas_normal+ cell.alphas_mask, dim=-1)
+            weights2_full = F.softmax( self.betas_reduce+ cell.betas_mask, dim=-1) if cell.reduction else \
+                            F.softmax( self.betas_normal+  cell.betas_mask, dim=-1)
+            weights2_full = weights2_full[weights2_full>0]
+            start_id = 0
+            n=0
+            for current_node,in_nodes in enumerate(cell.in_index):
+                gene[cell_name][current_node]=[]
+                gen_weight[cell_name][current_node]={}
+                weights1  = weights1_full[start_id:start_id+len(in_nodes)]#(x,36)
+                weights2  = weights2_full[start_id:start_id+len(in_nodes)]#(x,)
+                weights2  = weights2.unsqueeze(1) #[x,1]
+                W         = weights1*weights2 #[x,36]
+                start_id += len(in_nodes)
+                for j in range(len(in_nodes)):
+                    data    = W[j]/W[j].sum() +0.001
+                    data    = np.sqrt(data)
+                    data    = data
+                    in_node = in_nodes[j]
+                    ax      = ax_list[n]
+                    ax.set_ylim([0.0001,1.5])
+                    ax.set_yticks([])
+                    ax.set_xticks([])
+                    ax.bar(range(len(data)),data)
+                    #ax.set_yscale("symlog")
+                    ax.set_yticks([])
+                    if i == 0:
+                        ax.set_ylabel(f"{node_map(in_node)}->{current_node}",rotation=0,fontdict={'fontsize':30},labelpad=50)
+                    if n == 0:
+                        ax.set_xlabel(f"cell{i}",fontdict={'fontsize':30},labelpad=10)
+                        ax.xaxis.set_label_position('top')
+                    n      +=1
+        if save_path is not None:graph_fig.savefig(save_path, dpi=300)
+        return graph_fig

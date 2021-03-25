@@ -1,8 +1,75 @@
 from .MLlog import ModelSaver,AverageMeter,RecordLoss,Curve_data,IdentyMeter,LossStores
 from .fastprogress import master_bar, progress_bar,isnotebook
+from .tableprint.printer import summary_table_info
 from tensorboardX import SummaryWriter
 import tensorboardX
 import os
+import numpy as np
+
+class MetricDict:
+    def __init__(self,accu_list,show_best_accu_types=None):
+        self.accu_list   = accu_list
+        self.metric_dict = {}
+        self.show_best_accu_types = show_best_accu_types if show_best_accu_types is not None else accu_list
+        if not isinstance(self.show_best_accu_types,list):self.show_best_accu_types=[self.show_best_accu_types]
+
+        self.initial()
+
+    def initial(self):
+        accu_list = self.accu_list
+        metric_dict={'training_loss': None}
+        for accu_type in accu_list:
+            metric_dict[accu_type]                  = -1.0
+            metric_dict['best_'+accu_type]          = dict([[key,np.inf] for key in self.accu_list])
+            metric_dict['best_'+accu_type]['epoch'] = 0
+        self.metric_dict = metric_dict
+
+    def update(self,value_pool,epoch):
+        update_accu={}
+        for accu_type in self.accu_list:self.metric_dict[accu_type]= value_pool[accu_type]
+        for accu_type in self.accu_list:
+            update_accu[accu_type]=False
+            if self.metric_dict[accu_type]< self.metric_dict['best_'+accu_type][accu_type]:
+                self.metric_dict['best_'+accu_type]['epoch']=epoch
+                for accu_type_sub in self.accu_list:
+                    self.metric_dict['best_'+accu_type][accu_type_sub] = self.metric_dict[accu_type_sub]
+                update_accu[accu_type]=True
+        return update_accu
+    def state_dict(self):
+        return self.metric_dict
+
+    def load(self,state_dict):
+        state_dict_a = self.metric_dict
+        state_dict_b = state_dict
+        same_structureQ= True
+        for key,val in state_dict_b.items():
+            if key not in state_dict_a:
+                print(f"unexcepted key:{key} for your design metric ")
+                same_structureQ= False
+            else:
+                type1 = type(val)
+                type2 = type(state_dict_a[key])
+                if type1!=type2:
+                    print(f"different type for val/key:{key} wanted{type2} but given{type1}")
+                    same_structureQ= False
+        for key,val in state_dict_a.items():
+            if key not in state_dict_b:
+                print(f"wanted key:{key} for your design metric ")
+                same_structureQ= False
+        if not same_structureQ:
+            print("detected disaccord state dict, abort load")
+            raise
+        else:
+            self.metric_dict = state_dict
+
+
+    @property
+    def recorder_pool(self):
+        return dict([[key,None]  for key in self.keys if 'best' not in key])
+    @property
+    def keys(self):
+        return list(self.metric_dict.keys())
+
 class LoggingSystem:
     '''
     How to use:
@@ -12,18 +79,17 @@ class LoggingSystem:
         logsys.terminaler.
         logsys.webtracker.
     '''
-    def __init__(self,global_do_log,ckpt_root,gpu=0,verbose=True):
+    accu_list = metric_dict = show_best_accu_types = None
+    progress_bar =master_bar=train_bar=valid_bar   = None
+    recorder = train_recorder = valid_recorder     = None
+    global_step = None
+    def __init__(self,global_do_log,ckpt_root,gpu=0,project_name="project",verbose=True):
         self.global_do_log = global_do_log
         self.diable_logbar = not global_do_log
         self.ckpt_root     = ckpt_root
-        self.progress_bar  = None
-        self.recorder      = None
         self.Q_recorder_type = 'tensorboard'
         self.Q_batch_loss_record = False
-        self.master_bar = self.train_bar = self.valid_bar  = None
-        self.train_recorder = self.valid_recorder = None
         self.gpu_now    = gpu
-        self.global_step= None
         if verbose:print(f"log at {ckpt_root}")
 
     def train(self):
@@ -50,7 +116,9 @@ class LoggingSystem:
             self.recorder.add_figure(name,figure,epoch)
 
     def create_master_bar(self,batches,banner_info=None):
-        if banner_info is not None and self.global_do_log:print(banner_info)
+        if banner_info is not None and self.global_do_log:
+            if banner_info == 1:banner_info = self.banner.demo()
+            print(banner_info)
         if   isinstance(batches,int):batches=range(batches)
         elif isinstance(batches,list):pass
         else:raise NotImplementedError
@@ -123,3 +191,36 @@ class LoggingSystem:
         if self.master_bar is not None:self.master_bar.close()
         if self.train_bar is not None: self.train_bar.close()
         if self.valid_bar is not None: self.valid_bar.close()
+
+    def initial_metric_dict(self,accu_list):
+        self.accu_list   =  accu_list
+        self.metric_dict =  MetricDict(accu_list)
+        return self.metric_dict
+    def banner_initial(self,epoches,FULLNAME,training_loss_trace=['loss'],show_best_accu_types=None):
+        print("initialize the log banner")
+        self.show_best_accu_types = self.accu_list if show_best_accu_types is None else show_best_accu_types
+        assert isinstance(self.show_best_accu_types,list)
+        header      = [f'epoches:{epoches}']+self.accu_list+training_loss_trace
+        self.banner = summary_table_info(header,FULLNAME,rows=len(self.show_best_accu_types)+1)
+        print("\n".join(self.banner_str(0,FULLNAME)))
+        return self.banner
+
+    def banner_str(self,epoch,FULLNAME,train_losses=[-1]):
+        assert self.banner is not None
+        assert self.metric_dict is not None
+        metric_dict = self.metric_dict.state_dict()
+        accu_list   = self.accu_list
+        rows        = []
+        show_row_run= [f"epoch:{epoch+1}"]+[metric_dict[key] for key in accu_list]+train_losses
+        rows       += [show_row_run]
+
+        for accu_type in self.show_best_accu_types:
+            best_epoch = metric_dict['best_'+accu_type]['epoch']
+            show_row_temp = [f'{accu_type}:{best_epoch}']+[metric_dict['best_'+accu_type][key] for key in accu_list]+[""]
+            rows+=[show_row_temp]
+
+        outstring =  self.banner.show(rows,title=FULLNAME)
+        return outstring
+    def banner_show(self,epoch,FULLNAME,train_losses=[-1]):
+        outstring = self.banner_str(epoch,FULLNAME,train_losses)
+        self.runtime_log_table(outstring)

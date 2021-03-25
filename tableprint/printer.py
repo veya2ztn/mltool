@@ -391,7 +391,8 @@ class summary_table_info:
     def __init__(self,headers,title,rows=1):
         self.headers = headers
         self.title   = title
-        self.width   = [len(t)+2 for t in headers]
+        self.width   = [max(len(t)+2,10) for t in headers]
+        self.width[0]= max(self.width[1:])+2
         self.rows    = rows
     def demo(self):
         headers = self.headers

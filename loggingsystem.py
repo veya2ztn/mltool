@@ -6,6 +6,10 @@ import tensorboardX
 import os
 import numpy as np
 
+
+
+
+
 class MetricDict:
     def __init__(self,accu_list,show_best_accu_types=None):
         self.accu_list   = accu_list
@@ -72,12 +76,29 @@ class MetricDict:
 
 class LoggingSystem:
     '''
-    How to use:
-        logsys = LoggingSystem()
-        logsys.checkpoint.
-        logsys.webtracker.
-        logsys.terminaler.
-        logsys.webtracker.
+    import time
+    import numpy as np
+    from mltool.loggingsystem import LoggingSystem
+    accu_list = ['a','b','c']
+
+    logsys = LoggingSystem(True,"test")
+    logsys.Q_batch_loss_record=True
+
+    FULLNAME          = f"test-train_searched_model"
+
+    metric_dict       = logsys.initial_metric_dict(accu_list)
+    banner            = logsys.banner_initial(10,FULLNAME,show_best_accu_types=['a'])
+
+    master_bar        = logsys.create_master_bar(10)
+    logsys.train_bar  = logsys.create_progress_bar(1,unit=' img')
+    logsys.valid_bar  = logsys.create_progress_bar(1,unit=' img')
+    time.sleep(1)
+    for epoch in master_bar:
+        valid_acc_pool = dict([[key,np.random.rand()] for key in accu_list])
+        update_accu    = logsys.metric_dict.update(valid_acc_pool,epoch)
+        #if save_best_Q:train_utils.save(save_dir,epoch + 1,rng_seed,model,optimizer,metric_dict=metric_dict,level="best")
+        logsys.banner_show(epoch,FULLNAME)
+        time.sleep(1)
     '''
     accu_list = metric_dict = show_best_accu_types = None
     progress_bar =master_bar=train_bar=valid_bar   = None
@@ -196,13 +217,13 @@ class LoggingSystem:
         self.accu_list   =  accu_list
         self.metric_dict =  MetricDict(accu_list)
         return self.metric_dict
-    def banner_initial(self,epoches,FULLNAME,training_loss_trace=['loss'],show_best_accu_types=None):
+    def banner_initial(self,epoches,FULLNAME,training_loss_trace=['loss'],show_best_accu_types=None,print_once=True):
         print("initialize the log banner")
         self.show_best_accu_types = self.accu_list if show_best_accu_types is None else show_best_accu_types
         assert isinstance(self.show_best_accu_types,list)
         header      = [f'epoches:{epoches}']+self.accu_list+training_loss_trace
         self.banner = summary_table_info(header,FULLNAME,rows=len(self.show_best_accu_types)+1)
-        print("\n".join(self.banner_str(0,FULLNAME)))
+        if print_once:print("\n".join(self.banner_str(0,FULLNAME)))
         return self.banner
 
     def banner_str(self,epoch,FULLNAME,train_losses=[-1]):

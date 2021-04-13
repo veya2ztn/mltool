@@ -187,6 +187,7 @@ class LoggingSystem:
         if model is None:raise
         model = model.module if hasattr(model,'module') else model
         self.model_saver.save_latest_model(model,epoch,**kargs)
+        if self.metric_dict is not None:torch.save(self.metric_dict.state_dict(),os.path.join(self.ckpt_root,'metric_dict'))
 
     def runtime_log_table(self,table_string):
         if not self.global_do_log:return

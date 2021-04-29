@@ -97,10 +97,8 @@ class Curve_data(object):
 
 from .fastprogress import isnotebook
 
-try:
-    import tensorwatch as tw
-except:
-    tw=None
+try:import tensorwatch as tw
+except:tw=None
 
 IS_NOTEBOOK=isnotebook()
 
@@ -305,7 +303,7 @@ import time
 
 
 
-class ModelSaver_deprecated:
+class ModelSaver_V1:
     '''
     Load the path
     '''
@@ -511,12 +509,14 @@ class ModelSaver:
                         trace_latest_interval = 20,
                         block_best_interval   = 100,
                         epoches=None,**kargs):
-        self.epoches = epoches
+        self.epoches      = epoches
         self.status_file  = os.path.join(path,'saver_info.json')
         self.routine_path = os.path.join(path,'routine')
-        if not os.path.exists(self.routine_path):os.makedirs(self.routine_path)
         self.best_path    = os.path.join(path,'best')
+
+        if not os.path.exists(self.routine_path):os.makedirs(self.routine_path)
         if not os.path.exists(self.best_path):os.makedirs(self.best_path)
+
         self.early_stop_window  = es_max_window
         self.early_stop_mode    = es_mode
         self.accu_list    = accu_list
@@ -529,9 +529,9 @@ class ModelSaver:
         for accu_type in accu_list:
             self.loss_stores[accu_type]=LossStores()
         if not os.path.exists(self.status_file):self._initial()
-        else:
-            self._reload()
+        else:self._reload()
         self.saved_epoch_record=self.status['saved_epoch_record']
+
     def _initial(self):
         self.status = {}
         self.status['now_epoch']         = -1
@@ -556,6 +556,7 @@ class ModelSaver:
                     best_weight_name=accu_weight
                     if accu_type not in self.status['saved_epoch_record']:self.status['saved_epoch_record'][accu_type]=OrderedDict()
                     self.status['saved_epoch_record'][accu_type][best_epoch]=[best_epoch,best_value,saveQ,earlystopQ,best_weight_name]
+
         for epoch,pool in status_now['routine'].items():
             for accu_type in self.accu_list:
                 accu = pool[accu_type]
@@ -563,16 +564,46 @@ class ModelSaver:
         ### show a snap
         print("below is a snap for the previous training tracking")
         for accu_type in self.accu_list:
-            keys = list(self.loss_stores[accu_type].store.keys())[-20]
+            keys = list(self.loss_stores[accu_type].store.keys())[-20:]
             values=",".join(["{:.4f}".format(self.loss_stores[accu_type].store[key]) for key in keys])
             print(f"{accu_type}:{values}")
+
     def _get_status(self):
         # the _status record in a json file named "saver_info.json"
         with open(self.status_file,'r') as f:
             status_now = json.load(f)
         return status_now
+
     def _save_status(self,status_now):
         with open(self.status_file,'w') as f:_=json.dump(status_now,f)
+
+    def get_model_ckpt(self,checkpointer,epoch,mode='full'):
+        '''
+        checkpointer = {
+            "rng_seed": self.rdn_seed.get_save_states(),
+            "optimizer": optimizer.state_dict(),
+            "model": model.state_dict(),
+        }
+        '''
+        if isinstance(checkpointer,dict):
+            if 'model' in checkpointer:
+                model = checkpointer['model']
+                assert ('optimizer' in checkpointer['model']) or hasattr(model,'optimizer')
+                if 'optimizer' not in checkpointer['model']:checkpointer['optimizer'] = model.optimizer
+
+            checkpoint = {"epoch": epoch}
+
+            for name, object in checkpointer.items():
+                if mode=='light' and ("model" not in name):continue
+                checkpoint[name]=object.state_dict()
+            return checkpoint
+        else:
+            #兼容旧代码
+            try:
+                return model.all_state_dict(epoch=epoch,mode=mode)
+            except:
+                return model.state_dict()
+
     def save_latest_model(self,model,epoch,epoches=None):
         if epoches is None:epoches = self.epoches
         force_do = False
@@ -587,7 +618,8 @@ class ModelSaver:
                 existedweight=existedweight[0]
                 os.remove(os.path.join(self.routine_path,existedweight))
             path_at_save = os.path.join(self.routine_path,name_at_save)
-            model.save_to(path_at_save)
+            torch.save(self.get_model_ckpt(model,epoch),path_at_save)
+
     def get_latest_model(self):
         existedweight= os.listdir(self.routine_path)
         if len(existedweight)==0:
@@ -602,33 +634,34 @@ class ModelSaver:
             raise
         start_epoch = int(start_epoch[0])
         return weight_path,start_epoch
+
     def save_best_model(self,model,accu_pool,epoch,doearlystop=True,eps=None,save_inteval=20,epoches=None,**kargs):
         if epoches is None:epoches = self.epoches
         total_estop= 0
         for accu_type in self.accu_list:
             accu = accu_pool[accu_type]
-
             # reload
-            if accu_type not in self.saved_epoch_record:self.saved_epoch_record[accu_type]=OrderedDict()
-            now_saved_recorder= self.saved_epoch_record[accu_type]
-            if epoch>=1:
-                last_epoch = epoch-1
-                if last_epoch not in now_saved_recorder:last_epoch = list(now_saved_recorder.keys())[-1]# for reload
-                best_epoch,best_value,saveQ,earlystopQ,best_weight_name = now_saved_recorder[last_epoch]
-                best_epoch=int(best_epoch)
-                best_value=float(best_value)
-            else:
+            if accu_type not in self.saved_epoch_record:
+                self.saved_epoch_record[accu_type]=OrderedDict()
                 best_epoch = -1
                 best_value = np.inf
                 saveQ      = False
                 earlystopQ = False
                 best_weight_name ="none"
-
+                self.saved_epoch_record[accu_type][-1]=(best_epoch,best_value,saveQ,earlystopQ,best_weight_name)
+                
+            now_saved_recorder= self.saved_epoch_record[accu_type]
+            last_epoch = epoch-1
+            if last_epoch not in now_saved_recorder:
+                last_epoch = list(now_saved_recorder.keys())[-1]# for reload
+            best_epoch,best_value,saveQ,earlystopQ,best_weight_name = now_saved_recorder[last_epoch]
+            best_epoch=int(best_epoch)
+            best_value=float(best_value)
 
             ### update temp status
             if accu < best_value:
-                # if you want to catsh the state_dict in Memory, you neet copy.deepcopy it
-                self.model_weight[accu_type]  = copy.deepcopy(model.all_state_dict(epoch=epoch,mode="light"))
+                # if you want to catsh the state_dict into Memory, you neet copy.deepcopy it
+                self.model_weight[accu_type]  = copy.deepcopy(self.get_model_ckpt(model,epoch,mode='light'))
                 best_epoch = epoch
                 best_value = accu
                 saveQ      = False
@@ -637,6 +670,7 @@ class ModelSaver:
             if eps is None:
                 if "MAE" in accu_type:eps=0.001
                 else:eps=0.00001
+
             earlystopQ        = self.loss_stores[accu_type].earlystop(accu,eps=eps,max_length=self.early_stop_window,mode=self.early_stop_mode)
             if earlystopQ:total_estop+=1
             self.loss_stores[accu_type].update(accu,epoch)

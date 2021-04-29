@@ -78,3 +78,60 @@ def mem_report():
     _mem_report(cuda_tensors, 'GPU')
     _mem_report(host_tensors, 'CPU')
     print('='*LEN)
+
+
+def set_dropout(model, drop_rate=0.1):
+    for name, child in model.named_children():
+        if isinstance(child, torch.nn.Dropout):
+            child.p = drop_rate
+        set_dropout(child, drop_rate=drop_rate)
+
+def print_bn_mean_var(model,gpu):
+    for name, child in model.named_children():
+        #if isinstance(child, torch.nn.BatchNorm2d):
+        if isinstance(child, torch.nn.SyncBatchNorm):
+            rm = child.running_mean.mean()
+            rv = child.running_var.mean()
+            print("{} {} {} {}".format(gpu,name,rm,rv))
+        print_bn_mean_var(child,gpu)
+
+def print_linear_k_b(model,gpu):
+    for name, child in model.named_children():
+        #if isinstance(child, torch.nn.BatchNorm2d):
+        if isinstance(child, torch.nn.Linear):
+            rm = child.weight.mean()
+            rv = child.bias.mean()
+            print("{} {} {} {}".format(gpu,name,rm,rv))
+        print_linear_k_b(child,gpu)
+
+def print_conv_k_b(model,gpu):
+    for name, child in model.named_children():
+        #if isinstance(child, torch.nn.BatchNorm2d):
+        if isinstance(child, torch.nn.Conv2d):
+            rm = child.weight.mean()
+            rv = child.bias.mean() if child.bias is not None else None
+            print("{} {} {} {}".format(gpu,name,rm,rv))
+        print_conv_k_b(child,gpu)
+
+def init_weights(m):
+    if isinstance(m, nn.Conv2d):
+        torch.nn.init.xavier_uniform_(m.weight)
+        #torch.nn.init.constant_(m.weight,0.5)
+        if m.bias is not None:torch.nn.init.zeros_(m.bias)
+    if isinstance(m, nn.Linear):
+        #torch.nn.init.constant_(m.weight,0.5)
+        torch.nn.init.xavier_uniform_(m.weight)
+        m.bias.data.fill_(0.01)
+    if isinstance(m, nn.BatchNorm2d):
+        torch.nn.init.constant_(m.weight,0.5)
+        m.bias.data.fill_(0)
+    if type(m) in [nn.GRU, nn.LSTM, nn.RNN]:
+        for name, param in m.named_parameters():
+            if 'weight_ih' in name:
+                torch.nn.init.xavier_uniform_(param.data)
+                #torch.nn.init.constant_(param.data,0.5)
+            elif 'weight_hh' in name:
+                torch.nn.init.xavier_uniform_(param.data)
+                #torch.nn.init.constant_(param.data,0.5)
+            elif 'bias' in name:
+                param.data.fill_(0)

@@ -166,7 +166,7 @@ class WGAN_GP(object):
 
                 z = torch.rand((self.batch_size, 100, 1, 1))
 
-                images, z = self.get_torch_variable(images), self.get_torch_variable(z) 
+                images, z = self.get_torch_variable(images), self.get_torch_variable(z)
 
                 # Train discriminator
                 # WGAN - Training discriminator more iterations than generator
@@ -228,8 +228,7 @@ class WGAN_GP(object):
                 # inception_score = get_inception_score(new_sample_list, cuda=True, batch_size=32,
                 #                                       resize=True, splits=10)
 
-                if not os.path.exists('training_result_images/'):
-                    os.makedirs('training_result_images/')
+                if not os.path.exists('training_result_images/'):os.makedirs('training_result_images/')
 
                 # Denormalize images and save them in grid 8x8
                 z = self.get_torch_variable(torch.randn(800, 100, 1, 1))

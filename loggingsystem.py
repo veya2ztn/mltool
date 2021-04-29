@@ -1,14 +1,43 @@
 from .MLlog import ModelSaver,AverageMeter,RecordLoss,Curve_data,IdentyMeter,LossStores
 from .fastprogress import master_bar, progress_bar,isnotebook
 from .tableprint.printer import summary_table_info
+
 from tensorboardX import SummaryWriter
 import tensorboardX
-import os
+import os, random ,torch
 import numpy as np
+import torch.backends.cudnn as cudnn
 
 
+class RNGSeed:
+    def __init__(self, seed):
+        self.seed = seed
+        self.set_random_seeds()
 
+    def set_random_seeds(self):
+        seed = self.seed
+        random.seed(seed)
+        np.random.seed(seed)
+        cudnn.benchmark = False
+        torch.manual_seed(seed)
+        cudnn.enabled = True
+        cudnn.deterministic = True
+        torch.cuda.manual_seed(seed)
 
+    def state_dict(self):
+        rng_states = {
+            "random_state": random.getstate(),
+            "np_random_state": np.random.get_state(),
+            "torch_random_state": torch.get_rng_state(),
+            "torch_cuda_random_state": torch.cuda.get_rng_state_all(),
+        }
+        return rng_states
+
+    def load_state_dict(self, rng_states):
+        random.setstate(rng_states["random_state"])
+        np.random.set_state(rng_states["np_random_state"])
+        torch.set_rng_state(rng_states["torch_random_state"])
+        torch.cuda.set_rng_state_all(rng_states["torch_cuda_random_state"])
 
 class MetricDict:
     def __init__(self,accu_list,show_best_accu_types=None):
@@ -39,6 +68,7 @@ class MetricDict:
                     self.metric_dict['best_'+accu_type][accu_type_sub] = self.metric_dict[accu_type_sub]
                 update_accu[accu_type]=True
         return update_accu
+
     def state_dict(self):
         return self.metric_dict
 
@@ -66,6 +96,8 @@ class MetricDict:
         else:
             self.metric_dict = state_dict
 
+    def load_state_dict(self,state_dict):
+        self.load(state_dict)
 
     @property
     def recorder_pool(self):
@@ -100,18 +132,24 @@ class LoggingSystem:
         logsys.banner_show(epoch,FULLNAME)
         time.sleep(1)
     '''
-    accu_list = metric_dict = show_best_accu_types = None
+    accu_list = metric_dict = show_best_accu_types=rdn_seed = banner=None
     progress_bar =master_bar=train_bar=valid_bar   = None
     recorder = train_recorder = valid_recorder     = None
     global_step = None
-    def __init__(self,global_do_log,ckpt_root,gpu=0,project_name="project",verbose=True):
+    def __init__(self,global_do_log,ckpt_root,gpu=0,project_name="project",seed=None,verbose=True):
         self.global_do_log = global_do_log
         self.diable_logbar = not global_do_log
         self.ckpt_root     = ckpt_root
         self.Q_recorder_type = 'tensorboard'
         self.Q_batch_loss_record = False
         self.gpu_now    = gpu
+        if seed == 'random':seed = random.randint(1, 100000)
+        if isinstance(seed,int):self.set_rdn_seed(seed)
+        self.seed = seed
         if verbose:print(f"log at {ckpt_root}")
+
+    def set_rdn_seed(self,seed):
+        self.rdn_seed = RNGSeed(seed)
 
     def train(self):
         if not self.global_do_log:return
@@ -177,17 +215,64 @@ class LoggingSystem:
         self.recorder.file_writer.add_summary(sei)
         return self.recorder
 
+    def complete_the_ckpt(self,checkpointer,optimizer=None):
+        '''
+        checkpointer = {
+            "model": model,
+            "metric_dict":metric_dict,
+            "rdn_seed": self.rdn_seed, (option)
+            "optimizer": optimizer,  (option)
+            ...
+        }
+        '''
+        assert isinstance(checkpointer,dict)
+        #assert 'model' in checkpointer
+        if self.rdn_seed is not None and ("rdn_seed" not in checkpointer):
+            checkpointer["rdn_seed"] = self.rdn_seed
+        if 'model' in checkpointer:
+            if (optimizer is not None) or hasattr(model,'optimizer'):
+                if 'optimizer' not in checkpointer:
+                    checkpointer['optimizer']= model.optimizer if optimizer is None else optimizer
+        if 'metric_dict' not in checkpointer:
+            checkpointer['metric_dict']= self.metric_dict
+        #print(checkpointer)
+        return checkpointer
+
     def save_best_ckpt(self,model,accu_pool,epoch,**kargs):
         if not self.global_do_log:return False
         model = model.module if hasattr(model,'module') else model
         return self.model_saver.save_best_model(model,accu_pool,epoch,**kargs)
 
-    def save_latest_ckpt(self,model,epoch,**kargs):
+    def save_latest_ckpt(self,checkpointer,epoch,optimizer=None,**kargs):
         if not self.global_do_log:return
-        if model is None:raise
-        model = model.module if hasattr(model,'module') else model
-        self.model_saver.save_latest_model(model,epoch,**kargs)
-        if self.metric_dict is not None:torch.save(self.metric_dict.state_dict(),os.path.join(self.ckpt_root,'metric_dict'))
+        assert checkpointer is not None
+        if isinstance(checkpointer,dict):
+            checkpointer = self.complete_the_ckpt(checkpointer,optimizer=optimizer)
+        else:
+            checkpointer = checkpointer.module if hasattr(checkpointer,'module') else checkpointer
+        self.model_saver.save_latest_model(checkpointer,epoch,**kargs)
+
+    def load_checkpoint(self,checkpointer,path):
+        assert 'model' in checkpointer
+        if not isinstance(checkpointer,dict):#checkpointer is model
+            try:
+                model.load_from(path)
+                last_epoch = -1
+            except:
+                if 'state_dict' in state_dict:state_dict = state_dict['state_dict']
+                model.load_state_dict(state_dict)
+                last_epoch = state_dict['epoch']
+        else:
+            checkpointer = self.complete_the_ckpt(checkpointer)
+            state_dict = torch.load(path)
+            print("need reload key:");print(checkpointer.keys())
+            print("has key:");print(state_dict.keys())
+            for key in checkpointer:
+                print(f"reload {key}")
+                checkpointer[key].load_state_dict(state_dict[key])
+            last_epoch = state_dict['epoch']
+        return last_epoch
+
 
     def runtime_log_table(self,table_string):
         if not self.global_do_log:return
@@ -202,6 +287,7 @@ class LoggingSystem:
             self.global_step+=1
         else:
             return
+
     def save_scalars(self):
         if not self.global_do_log:return
         if self.Q_recorder_type == 'tensorboard':
@@ -218,6 +304,7 @@ class LoggingSystem:
         self.accu_list   =  accu_list
         self.metric_dict =  MetricDict(accu_list)
         return self.metric_dict
+
     def banner_initial(self,epoches,FULLNAME,training_loss_trace=['loss'],show_best_accu_types=None,print_once=True):
         print("initialize the log banner")
         self.show_best_accu_types = self.accu_list if show_best_accu_types is None else show_best_accu_types
@@ -238,9 +325,9 @@ class LoggingSystem:
 
         for accu_type in self.show_best_accu_types:
             best_epoch = metric_dict['best_'+accu_type]['epoch']
-            show_row_temp = [f'{accu_type}:{best_epoch}']+[metric_dict['best_'+accu_type][key] for key in accu_list]+[""]
+            show_row_temp = [f'{accu_type}:{best_epoch}']+[metric_dict['best_'+accu_type][key] for key in accu_list]+[""]*len(train_losses)
             rows+=[show_row_temp]
-
+        
         outstring =  self.banner.show(rows,title=FULLNAME)
         return outstring
     def banner_show(self,epoch,FULLNAME,train_losses=[-1]):

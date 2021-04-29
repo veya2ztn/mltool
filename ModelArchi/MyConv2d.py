@@ -4,15 +4,6 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
-def relu2leackrelu(module,_slope=0.2):
-    module_output = module
-    if isinstance(module, torch.nn.ReLU):
-        module_output = torch.nn.LeakyReLU(inplace=True,negative_slope=_slope)
-    for name, child in module.named_children():
-        module_output.add_module(name, relu2leackrelu(child,_slope))
-    del module
-    return module_output
-
 class Bottleneck(nn.Module):
     """ Adapted from torchvision.models.resnet """
 
@@ -62,7 +53,6 @@ class Bottleneck(nn.Module):
         out = self.relu(out)
 
         return out
-
 class BottleneckV0(Bottleneck):
     def __init__(self, in_channels, output_channels, stride,**kargs):
         mid_channels  = in_channels
@@ -75,10 +65,6 @@ class BottleneckV2(Bottleneck):
     def __init__(self, in_channels, output_channels, stride,**kargs):
         mid_channels  = (in_channels+output_channels)//2
         super().__init__(in_channels, output_channels, stride,mid_channels=mid_channels,**kargs)
-
-
-
-
 class ResNetConfig(nn.Module):
     def __init__(self, block,layerconfig):
         super().__init__()
@@ -112,7 +98,6 @@ class ResNetConfig(nn.Module):
         x = self.finalpool(x)
 
         return x
-
 class SimpleResNetConfig(nn.Module):
     def __init__(self, block,layerconfig,relu=nn.ReLU(inplace=True)):
         super().__init__()
@@ -142,9 +127,6 @@ class SimpleResNetConfig(nn.Module):
         for layer in self.layers:x = layer(x)
 
         return x
-
-
-
 class FPNUpSample(nn.Module):
     def __init__(self, block,layerconfig):
         super().__init__()

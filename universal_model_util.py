@@ -86,6 +86,16 @@ def set_dropout(model, drop_rate=0.1):
             child.p = drop_rate
         set_dropout(child, drop_rate=drop_rate)
 
+
+def relu2leackrelu(module,_slope=0.2):
+    module_output = module
+    if isinstance(module, torch.nn.ReLU):
+        module_output = torch.nn.LeakyReLU(inplace=True,negative_slope=_slope)
+    for name, child in module.named_children():
+        module_output.add_module(name, relu2leackrelu(child,_slope))
+    del module
+    return module_output
+
 def print_bn_mean_var(model,gpu):
     for name, child in model.named_children():
         #if isinstance(child, torch.nn.BatchNorm2d):

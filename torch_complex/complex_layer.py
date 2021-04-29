@@ -8,6 +8,8 @@ from torch.nn.modules.utils import _pair,_single,_triple
 #from .layer_transformer import SemiToReal ,SemiToReal_Conv2d_first_layer
 # Realization = SemiToReal
 # Realization_Conv2d_first_layer=SemiToReal_Conv2d_first_layer
+NEW_TORCH_FLAG =  (int(torch.__version__.split('.')[0])>=1) and (int(torch.__version__.split('.')[1])>=6)
+NEW_TORCH_FLAG = False #we wont use new torch complex tensor, since it is not compelete 
 
 class ComplexLinear(torch.nn.Linear):
     '''
@@ -130,7 +132,8 @@ class ComplexReLU(torch.nn.ReLU):
 class ComplexTanh(torch.nn.Tanh):
     def forward(self, x):
         assert x.shape[-1]==2
-        if int(torch.__version__.split('.')[0])>=1 and int(torch.__version__.split('.')[1])>=6 and False:
+        if NEW_TORCH_FLAG:
+
             # torch 1.6 has complex operation support
             x = torch.view_as_complex(x)
             x = x.tanh()

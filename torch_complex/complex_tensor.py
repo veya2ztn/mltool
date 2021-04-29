@@ -3,8 +3,7 @@ from .complex_scalar import ComplexScalar
 import numpy as np
 import torch
 import re
-
-
+NEW_TORCH_FLAG =  (int(torch.__version__.split('.')[0])>=1) and (int(torch.__version__.split('.')[1])>=6)
 
 class ComplexTensor(torch.Tensor):
     @staticmethod
@@ -152,8 +151,8 @@ class ComplexTensor(torch.Tensor):
         result.__class__ = ComplexTensor
         return result
 
-    def numpy(self):
-        return C.complex_tch2np(self)
+    # def numpy(self):
+    #     return C.complex_tch2np(self)
 
     def __repr__(self):
         # use numpy to print for us

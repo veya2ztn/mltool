@@ -9,7 +9,7 @@ from torch.nn.modules.utils import _pair,_single,_triple
 # Realization = SemiToReal
 # Realization_Conv2d_first_layer=SemiToReal_Conv2d_first_layer
 NEW_TORCH_FLAG =  (int(torch.__version__.split('.')[0])>=1) and (int(torch.__version__.split('.')[1])>=6)
-NEW_TORCH_FLAG = False #we wont use new torch complex tensor, since it is not compelete 
+NEW_TORCH_FLAG = False #we wont use new torch complex tensor, since it is not compelete
 
 class ComplexLinear(torch.nn.Linear):
     '''

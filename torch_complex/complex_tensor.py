@@ -34,6 +34,7 @@ class ComplexTensor(torch.Tensor):
     @property
     def radius(self):
         result = self.norm(dim=-1)
+        result.__class__=torch.Tensor
         return result
 
     @property
@@ -41,6 +42,7 @@ class ComplexTensor(torch.Tensor):
         real   = self.real
         imag   = self.imag
         result = torch.atan(imag/real)
+        result.__class__=torch.Tensor
         return result
 
     @property
@@ -88,7 +90,7 @@ class ComplexTensor(torch.Tensor):
         return ComplexScalar(real_mean, imag_mean)
 
     def abs(self):
-        return self.norm(dim=-1)
+        return self.radius
 
     def add(self,m):
         if isinstance(c,ComplexTensor):
@@ -158,7 +160,8 @@ class ComplexTensor(torch.Tensor):
         # use numpy to print for us
         # strings = np.asarray([f'({a}{"+" if b > 0 else "-"}{abs(b)}j)' for a, b in zip(real, imag)])
         #strings = np.asarray([complex(a,b) for a, b in zip(real, imag)]).astype(np.complex64)
-        strings = C.complex_tch2np(self)
+
+        strings = C.complex_tch2np(self.cpu())
         strings = strings.__repr__()
         strings = re.sub('array', 'tensor', strings)
         return strings

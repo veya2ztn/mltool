@@ -600,9 +600,9 @@ class ModelSaver:
         else:
             #兼容旧代码
             try:
-                return model.all_state_dict(epoch=epoch,mode=mode)
+                return checkpointer.all_state_dict(epoch=epoch,mode=mode)
             except:
-                return model.state_dict()
+                return checkpointer.state_dict()
 
     def save_latest_model(self,model,epoch,epoches=None):
         if epoches is None:epoches = self.epoches
@@ -649,7 +649,7 @@ class ModelSaver:
                 earlystopQ = False
                 best_weight_name ="none"
                 self.saved_epoch_record[accu_type][-1]=(best_epoch,best_value,saveQ,earlystopQ,best_weight_name)
-                
+
             now_saved_recorder= self.saved_epoch_record[accu_type]
             last_epoch = epoch-1
             if last_epoch not in now_saved_recorder:

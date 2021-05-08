@@ -510,33 +510,44 @@ class ModelSaver:
                         block_best_interval   = 100,
                         epoches=None,**kargs):
         self.epoches      = epoches
-        self.status_file  = os.path.join(path,'saver_info.json')
-        self.routine_path = os.path.join(path,'routine')
-        self.best_path    = os.path.join(path,'best')
+        self.accu_list    = accu_list
+        self.path         = path
 
-        if not os.path.exists(self.routine_path):os.makedirs(self.routine_path)
-        if not os.path.exists(self.best_path):os.makedirs(self.best_path)
-
+        self.routine_path = os.path.join(self.path,'routine')
+        self.best_path    = os.path.join(self.path,'best')
+        self.status_file  = os.path.join(self.path,'saver_info.json')
+        ## for early stop
         self.early_stop_window  = es_max_window
         self.early_stop_mode    = es_mode
-        self.accu_list    = accu_list
-        self.loss_stores  = {}
-        self.temp_info    = {}
-        self.model_weight = {}
-        self.last_save_epoch={}
+
+        ## for early stop
+
         self.trace_latest_interval = trace_latest_interval
         self.block_best_interval   = block_best_interval
-        for accu_type in accu_list:
-            self.loss_stores[accu_type]=LossStores()
-        if not os.path.exists(self.status_file):self._initial()
-        else:self._reload()
-        self.saved_epoch_record=self.status['saved_epoch_record']
+
+        self.model_weight          = {}
+
+        if not os.path.exists(self.status_file):
+            self._initial()
+        else:
+            self._reload()
+
+    @property
+    def saved_epoch_record(self):
+        return self.status['saved_epoch_record']
 
     def _initial(self):
+        if not os.path.exists(self.routine_path):os.makedirs(self.routine_path)
+        if not os.path.exists(self.best_path):os.makedirs(self.best_path)
         self.status = {}
         self.status['now_epoch']         = -1
         self.status['routine']           = OrderedDict()
         self.status['saved_epoch_record']= {}
+
+        self.loss_stores  = {}
+        for accu_type in self.accu_list:
+            self.loss_stores[accu_type]=LossStores()
+
         self._save_status(self.status)
 
     def _reload(self):
@@ -620,20 +631,37 @@ class ModelSaver:
             path_at_save = os.path.join(self.routine_path,name_at_save)
             torch.save(self.get_model_ckpt(model,epoch),path_at_save)
 
-    def get_latest_model(self):
+    def get_latest_model(self,soft_mode=False):
         existedweight= os.listdir(self.routine_path)
         if len(existedweight)==0:
             print("====> no latest weight find <====")
+            if soft_mode:return None,0
             raise
         existedweight=existedweight[0]
         print(f"====> find latest weight: {existedweight}  <====")
-        weight_path = os.path.join(self.routine_path,existedweight)
+        weight_path = os.path.join('routine',existedweight)
         start_epoch = re.findall(r"epoch-(.*)", existedweight)
         if len(start_epoch)==0:
             print("====> can not parse the start_epoch <====")
             raise
         start_epoch = int(start_epoch[0])
-        return weight_path,start_epoch
+        return existedweight,start_epoch
+
+    def get_best_model(self,key_flag=None):
+        existedweight= os.listdir(self.routine_path)
+        if len(existedweight)==0:
+            print('no best saver')
+            return None
+        if len(existedweight)>1:
+            print("====> multi best weight find<====")
+            print(existedweight)
+            assert not key_flag
+        if not key_flag:
+            existedweight=existedweight[0]
+        else:
+            existedweight=[p for p in existedweight if key_flag in existedweight][0]
+        weight_path = os.path.join('best',existedweight)
+        return weight_path
 
     def save_best_model(self,model,accu_pool,epoch,doearlystop=True,eps=None,save_inteval=20,epoches=None,**kargs):
         if epoches is None:epoches = self.epoches

@@ -7,7 +7,7 @@ import tensorboardX
 import os, random ,torch
 import numpy as np
 import torch.backends.cudnn as cudnn
-
+import shutil
 
 class RNGSeed:
     def __init__(self, seed):
@@ -45,12 +45,12 @@ class MetricDict:
         self.metric_dict = {}
         self.show_best_accu_types = show_best_accu_types if show_best_accu_types is not None else accu_list
         if not isinstance(self.show_best_accu_types,list):self.show_best_accu_types=[self.show_best_accu_types]
-
+        self.recorderer  = {}
         self.initial()
 
     def initial(self):
         accu_list = self.accu_list
-        metric_dict={'training_loss': None}
+        metric_dict={'training_loss': None,"runtime":{"epoch":[]}}
         for accu_type in accu_list:
             metric_dict[accu_type]                  = -1.0
             metric_dict['best_'+accu_type]          = dict([[key,np.inf] for key in self.accu_list])
@@ -58,8 +58,15 @@ class MetricDict:
         self.metric_dict = metric_dict
 
     def update(self,value_pool,epoch):
-        update_accu={}
-        for accu_type in self.accu_list:self.metric_dict[accu_type]= value_pool[accu_type]
+        update_accu = {}
+        self.metric_dict["runtime"]["epoch"].append(epoch)
+        for accu_type,val in value_pool.items():
+            if accu_type not in self.metric_dict["runtime"]:self.metric_dict["runtime"][accu_type]=[]
+            self.metric_dict["runtime"][accu_type].append(val)
+            if accu_type not in self.metric_dict:continue
+            self.metric_dict[accu_type] = val
+        # for accu_type in self.accu_list:
+        #     self.metric_dict[accu_type]= value_pool[accu_type]
         for accu_type in self.accu_list:
             update_accu[accu_type]=False
             if self.metric_dict[accu_type]< self.metric_dict['best_'+accu_type][accu_type]:
@@ -193,8 +200,8 @@ class LoggingSystem:
 
     def create_model_saver(self,path=None,accu_list=None,**kargs):
         if not self.global_do_log:return
-        if path is None:path=self.ckpt_root
-        self.model_saver = ModelSaver(path,accu_list,**kargs)
+        self.saver_path  = os.path.join(self.ckpt_root,'saver') if not path else path
+        self.model_saver = ModelSaver(self.saver_path,accu_list,**kargs)
 
     def create_recorder(self,**kargs):
         if not self.global_do_log:return
@@ -273,6 +280,16 @@ class LoggingSystem:
             last_epoch = state_dict['epoch']
         return last_epoch
 
+    def archive_saver(self,archive_flag=None,key_flag=None):
+        archive_flag     = time.strftime("%m_%d_%H_%M_%S") if not archive_flag else archive_flag
+        routine_weight_path,epoch = self.model_saver.get_latest_model(soft_mode=True)
+        best_weight_path    = self.model_saver.get_best_model(key_flag=key_flag)
+        new_saver_path      = self.saver_path+f".{archive_flag}"
+        routine_weight_path = os.path.join(new_saver_path,routine_weight_path) if routine_weight_path is not None else None
+        best_weight_path    = os.path.join(new_saver_path,best_weight_path) if best_weight_path is not None else None
+        os.rename(self.saver_path,new_saver_path)
+        self.model_saver._initial()
+        return (routine_weight_path,epoch),best_weight_path
 
     def runtime_log_table(self,table_string):
         if not self.global_do_log:return
@@ -327,7 +344,7 @@ class LoggingSystem:
             best_epoch = metric_dict['best_'+accu_type]['epoch']
             show_row_temp = [f'{accu_type}:{best_epoch}']+[metric_dict['best_'+accu_type][key] for key in accu_list]+[""]*len(train_losses)
             rows+=[show_row_temp]
-        
+
         outstring =  self.banner.show(rows,title=FULLNAME)
         return outstring
     def banner_show(self,epoch,FULLNAME,train_losses=[-1]):

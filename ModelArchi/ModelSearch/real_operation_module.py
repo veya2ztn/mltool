@@ -3,14 +3,38 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.batchnorm import _BatchNorm
 
+class ReLUcclConvBN(nn.Module):
+    def __init__(self, C_in, C_out, k, s, d, circularQ=True,affine=True):
+        super(ReLUcclConvBN, self).__init__()
+        pp = ((k-1)*d+1-s)//2
+        pp = 2*pp if (float(torch.__version__[:3]) < 1.5 and circularQ) else pp
+
+        self.op = nn.Sequential(
+          nn.ReLU(inplace=False),
+          nn.Conv2d(C_in, C_out, k, stride=s, padding=pp,dilation=d, bias=False,padding_mode="circular" if circularQ else 'zeros'),
+          AdaptiveBatchNorm2d(C_out, affine=affine)
+        )
+
+    def forward(self, x):
+        return self.op(x)
+class ReLUcclConvBNWrapper:
+    def __init__(self,k,s,d,Q):
+        self.k      = k
+        self.s      = s
+        self.d      = d
+        self.Q      = Q
+
+    def __call__(self,C,stride,affine):
+        return ReLUcclConvBN(C,C,self.k,self.s,self.d,circularQ=self.Q,affine=affine)
+
 class AdaptiveBatchNorm2d(_BatchNorm):
     def _check_input_dim(self, input):
         if input.dim() != 4:
             raise ValueError('expected 4D input (got {}D input)' .format(input.dim()))
     def forward(self, input):
         self._check_input_dim(input)
-        if input.shape[-1]==1:
-            return input
+        #!!!below is the only different
+        if input.shape[-2]==1:return input
 
         # exponential_average_factor is set to self.momentum
         # (when it is available) only so that it gets updated
@@ -46,33 +70,7 @@ class AdaptiveBatchNorm2d(_BatchNorm):
             self.running_var if not self.training or self.track_running_stats else None,
             self.weight, self.bias, bn_training, exponential_average_factor, self.eps)
 
-class ReLUcclConvBN(nn.Module):
-    def __init__(self, C_in, C_out, k, s, d, circularQ=True,affine=True):
-        super(ReLUcclConvBN, self).__init__()
-        pp = ((k-1)*d+1-s)//2
-        pp = 2*pp if (float(torch.__version__[:3]) < 1.5 and circularQ) else pp
-
-        self.op = nn.Sequential(
-          nn.ReLU(inplace=False),
-          nn.Conv2d(C_in, C_out, k, stride=s, padding=pp,dilation=d, bias=False,padding_mode="circular" if circularQ else 'zeros'),
-          AdaptiveBatchNorm2d(C_out, affine=affine)
-        )
-
-    def forward(self, x):
-        return self.op(x)
-class ReLUcclConvBNWrapper:
-    def __init__(self,k,s,d,Q):
-        self.k      = k
-        self.s      = s
-        self.d      = d
-        self.Q      = Q
-
-    def __call__(self,C,stride,affine):
-        return ReLUcclConvBN(C,C,self.k,self.s,self.d,circularQ=self.Q,affine=affine)
-
-
 class ReLUConvBN(nn.Module):
-
   def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
     super(ReLUConvBN, self).__init__()
     self.op = nn.Sequential(
@@ -80,7 +78,6 @@ class ReLUConvBN(nn.Module):
       nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
       AdaptiveBatchNorm2d(C_out, affine=affine)
     )
-
   def forward(self, x):
     return self.op(x)
 class DilConv(nn.Module):

@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from .operations_define import *
-from .operations_define import DARTS_ORIGIN_OPS as OPS
 from torch.autograd import Variable
 
 

@@ -1,9 +1,8 @@
 # copy from https://github.com/liamcli/gaea_release
-
-from torch.optim.lr_scheduler import _LRScheduler
+from torch.optim.lr_scheduler import _LRScheduler,ReduceLROnPlateau
 import numpy as np
 
-class TriangleScheduler(_LRScheduler):
+class TriangleScheduler(ReduceLROnPlateau):
     """
     Simple class to linearly increase lr until loss stops decreasing
     with a certain grace period, then, linearly decrease lr.
@@ -15,20 +14,25 @@ class TriangleScheduler(_LRScheduler):
         max_lr=0.1,
         min_lr=0.001,
         patience=5,
-        max_epoch=20,
+        max_epoch=3000,
         last_epoch=-1,
     ):
+        self.optimizer=optimizer
         self.slope = slope
         self.max_lr = max_lr
         self.min_lr = min_lr
         self.patience = patience
         self.max_epoch = max_epoch
-        # Initialize stateful vars
         self.counter = 0
         self.min_loss = 100
         self.increase = True
+        self.last_epoch=-1
+        self.base_lrs = [group['lr'] for group in self.optimizer.param_groups]
+    def state_dict(self):
+        return {key: value for key, value in self.__dict__.items() if key != 'optimizer'}
 
-        super(TriangleScheduler, self).__init__(optimizer, last_epoch)
+    def load_state_dict(self, state_dict):
+        self.__dict__.update(state_dict)
 
     def get_lr(self):
         if self.last_epoch == 0:
@@ -55,18 +59,30 @@ class TriangleScheduler(_LRScheduler):
         if not self.increase and loss > self.min_loss:self.slope += self.slope
         if self.counter > self.patience:
             self.increase = False
-        if (self.max_lr - self.min_lr) / (self.max_epoch - self.last_epoch) > self.slope:
+        if (self.max_lr - self.min_lr) / (self.max_epoch - self.last_epoch + 0.01) > self.slope:
             self.increase = False
 
+    def step(self, loss, epoch=None):
+        # convert `metrics` to float, in case it's a zero-dim Tensor
+        if epoch is None:
+            epoch = self.last_epoch + 1
+        else:
+            warnings.warn(EPOCH_DEPRECATION_WARNING, UserWarning)
+        self.last_epoch = epoch
+
+        self.update_lr_state(loss)
+        new_lrs = self.get_lr()
+        for new_lr, param_group in zip(new_lrs,self.optimizer.param_groups):
+            param_group['lr'] = new_lr
 
 class CosinePowerAnnealing(_LRScheduler):
     def __init__(
         self,
         optimizer,
-        power = 1 ,
+        max_epoch = 3000,
         cycles= 1,
+        power = 1 ,
         min_lr= 0.0001,
-        max_epoch = 20,
         cycle_decay=0.5,
         last_epoch=-1,
     ):
@@ -114,3 +130,11 @@ class CosinePowerAnnealing(_LRScheduler):
             self.min_lr + (lr_decay * base_lr - self.min_lr) * numerator / denominator
             for base_lr in self.base_lrs
         ]
+
+    def step(self, epoch=None):
+        # convert `metrics` to float, in case it's a zero-dim Tensor
+        if epoch is None:epoch = self.last_epoch + 1
+        self.last_epoch = epoch
+        new_lrs = self.get_lr()
+        for new_lr, param_group in zip(new_lrs,self.optimizer.param_groups):
+            param_group['lr'] = new_lr

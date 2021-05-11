@@ -83,6 +83,7 @@ class MetricDict:
         state_dict_b = state_dict
         same_structureQ= True
         for key,val in state_dict_b.items():
+            if key in ["runtime"]:continue
             if key not in state_dict_a:
                 print(f"unexcepted key:{key} for your design metric ")
                 same_structureQ= False
@@ -93,6 +94,7 @@ class MetricDict:
                     print(f"different type for val/key:{key} wanted{type2} but given{type1}")
                     same_structureQ= False
         for key,val in state_dict_a.items():
+            if key in ["runtime"]:continue
             if key not in state_dict_b:
                 print(f"wanted key:{key} for your design metric ")
                 same_structureQ= False

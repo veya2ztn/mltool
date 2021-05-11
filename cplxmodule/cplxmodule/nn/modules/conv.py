@@ -188,10 +188,8 @@ class CplxConvTransposeNd(CplxConvNd):
             in_channels, out_channels, _triple(kernel_size), _triple(stride),
             _triple(padding), _triple(dilation), transposed, output_padding,
             groups, bias, padding_mode)
-
-    _output_padding = torch.nn.modules.conv._ConvTransposeNd._output_padding
-
-
+    NEW_TORCH_FLAG =  (int(torch.__version__.split('.')[0])>=1) and (int(torch.__version__.split('.')[1])>=6)
+    _output_padding = torch.nn.modules.conv._ConvTransposeNd._output_padding if NEW_TORCH_FLAG else True
 class CplxConvTranspose1d(CplxConvTransposeNd):
     r"""Complex 1D transposed convolution.
 
@@ -223,8 +221,6 @@ class CplxConvTranspose1d(CplxConvTransposeNd):
         return cplx.conv_transpose1d(
             input, self.weight, self.bias, self.stride, self.padding,
             output_padding, self.groups, self.dilation, self.padding_mode)
-
-
 class CplxConvTranspose2d(CplxConvTransposeNd):
     r"""Complex 2D transposed convolution.
 
@@ -256,8 +252,6 @@ class CplxConvTranspose2d(CplxConvTransposeNd):
         return cplx.conv_transpose2d(
             input, self.weight, self.bias, self.stride, self.padding,
             output_padding, self.groups, self.dilation, self.padding_mode)
-
-
 class CplxConvTranspose3d(CplxConvTransposeNd):
     r"""Complex 3D transposed convolution.
 

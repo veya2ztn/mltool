@@ -6,7 +6,7 @@ import numpy as np
 from collections import OrderedDict
 
 from .operations_define import MSOPS,MSOPS_NO,NORMALSIZE,REDUCESIZE,get_OPs_for
-from .operations_layers import ReLUConvBN,FactorizedReduce,AdaptiveBatchNorm2d
+from .real_operation_module import ReLUConvBN,FactorizedReduce,AdaptiveBatchNorm2d
 
 def channel_shuffle(x, groups):
     batchsize, num_channels, height, width = x.data.size()

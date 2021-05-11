@@ -189,7 +189,7 @@ class CplxConvTransposeNd(CplxConvNd):
             _triple(padding), _triple(dilation), transposed, output_padding,
             groups, bias, padding_mode)
 
-    _output_padding = torch.nn.modules.conv._ConvTransposeNd._output_padding
+    _output_padding = torch.nn.modules.conv._ConvTransposeNd._output_padding if NEW_TORCH_FLAG else True
 
 
 class CplxConvTranspose1d(CplxConvTransposeNd):

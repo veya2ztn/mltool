@@ -10,8 +10,8 @@ def drop_path(x, drop_prob):
         mask = Variable(
             torch.cuda.FloatTensor(x.size(0), 1, 1, 1).bernoulli_(keep_prob)
         )
-        x.div_(keep_prob)
-        x.mul_(mask)
+        x=x.div(keep_prob) ## do not use inplace operation x.div_(keep_prob)
+        x=x.mul(mask)
     return x
 
 class Cell(nn.Module):

@@ -1,7 +1,7 @@
 
 import copy
 import numpy as np
-from groupy.garray.garray import GArray
+from ..garray.garray import GArray
 
 
 class GFuncArray(object):

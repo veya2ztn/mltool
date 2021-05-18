@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torch
 import math
 from torch.nn.modules.utils import _pair
-from groupy.gconv.make_gconv_indices import *
+from ..groupy.gconv.make_gconv_indices import *
 from torch.nn import Conv2d
 
 make_indices_functions = {(1, 4): make_c4_z2_indices,

@@ -4,27 +4,27 @@
 
 
 def test_p4_array():
-    from groupy.garray import p4_array
+    from  import p4_array
     check_wallpaper_group(p4_array, p4_array.P4Array)
 
 
 def test_p4m_array():
-    from groupy.garray import p4m_array
+    from  import p4m_array
     check_wallpaper_group(p4m_array, p4m_array.P4MArray)
 
 
 def test_z2_array():
-    from groupy.garray import Z2_array
+    from  import Z2_array
     check_wallpaper_group(Z2_array, Z2_array.Z2Array)
 
 
 def test_c4_array():
-    from groupy.garray import C4_array
+    from  import C4_array
     check_finite_group(C4_array, C4_array.C4Array, C4_array.C4)
 
 
 def test_d4_array():
-    from groupy.garray import D4_array
+    from  import D4_array
     check_finite_group(D4_array, D4_array.D4Array, D4_array.D4)
 
 

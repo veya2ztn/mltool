@@ -2,8 +2,8 @@ import numpy as np
 
 
 def test_p4_func():
-    from groupy.gfunc.p4func_array import P4FuncArray
-    import groupy.garray.C4_array as c4a
+    from .p4func_array import P4FuncArray
+    from ..garray import C4_array as c4a
 
     v = np.random.randn(2, 6, 4, 5, 5)
     f = P4FuncArray(v=v)
@@ -18,8 +18,8 @@ def test_p4_func():
 
 
 def test_p4m_func():
-    from groupy.gfunc.p4mfunc_array import P4MFuncArray
-    import groupy.garray.D4_array as d4a
+    from .p4mfunc_array import P4MFuncArray
+    from ..garray import D4_array as d4a
 
     v = np.random.randn(2, 6, 8, 5, 5)
     f = P4MFuncArray(v=v)
@@ -34,9 +34,9 @@ def test_p4m_func():
 
 
 def test_z2_func():
-    from groupy.gfunc.z2func_array import Z2FuncArray
-    import groupy.garray.C4_array as c4a
-    import groupy.garray.C4_array as d4a
+    from .z2func_array import Z2FuncArray
+    from ..garray import C4_array as c4a
+    from ..garray import C4_array as d4a
 
     v = np.random.randn(2, 6, 5, 5)
     f = Z2FuncArray(v=v)
@@ -78,8 +78,3 @@ def check_i2g_g2i_invertible(f):
     i = f.g2i(i2g)
     inds = [i[..., j] for j in range(i.shape[-1])]
     assert (i2g[inds] == i2g).all()
-
-
-
-
-

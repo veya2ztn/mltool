@@ -541,10 +541,8 @@ class ModelSaver:
         self.block_best_interval   = block_best_interval
 
         self.model_weight          = {}
-
-        if not os.path.exists(self.status_file):
-            self._initial()
-        else:
+        self._initial()
+        if os.path.exists(self.status_file):
             self._reload()
 
     @property

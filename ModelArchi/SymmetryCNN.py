@@ -6,6 +6,7 @@ import math
 from torch.nn.modules.utils import _pair
 #from ..groupy.gconv.make_gconv_indices import *
 from torch.nn import Conv2d
+import numpy as np
 
 class fliprot90:
     def __init__(self,rot_times,flip):
@@ -32,7 +33,7 @@ def get_slice_for_Group(ksize,Group):
     return inds
 
 
-def trans_filter(w, inds):
+def trans_filter(w, inds_reshape):
     w_indexed = w[..., inds_reshape[0].tolist(), inds_reshape[1].tolist()]
     w_indexed = w_indexed.view(w.size(0), w.size(1),-1, w.size(-2), w.size(-1))
     w_indexed = w_indexed.permute(0, 2, 1, 3, 4).contiguous()
@@ -62,6 +63,7 @@ class Symmetry_Conv2d(Conv2d):
             self.bias = None
             self.register_parameter('bias', None)
         self.reset_parameters()
+        self.inds  = get_slice_for_Group(kernel_size,self.Group)
     def forward(self, x):
         weight = trans_filter(self.weight, self.inds)
         x = F.conv2d(x, weight, self.bias, self.stride,self.padding, self.dilation, self.groups) if self.padding_mode == 'zeros' else \
@@ -72,16 +74,16 @@ class Symmetry_Conv2d(Conv2d):
 
 class P4_Conv2d(Symmetry_Conv2d):
     group_num = 4
-    inds  = get_slice_for_Group(kernel_size,GroupP4)
+    Group     = GroupP4
 
 class P4Z2_Conv2d(Symmetry_Conv2d):
     group_num = 8
-    inds      = get_slice_for_Group(kernel_size,GroupP4Z2)
+    Group     = GroupP4Z2
 
 class V2_Conv2d(Symmetry_Conv2d):
     group_num = 2
-    inds      = get_slice_for_Group(kernel_size,GroupV2)
+    Group     = GroupV2
 
 class H2_Conv2d(Symmetry_Conv2d):
     group_num = 2
-    inds      = get_slice_for_Group(kernel_size,GroupH2)
+    Group     = GroupH2

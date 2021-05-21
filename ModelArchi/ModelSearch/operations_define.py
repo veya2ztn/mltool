@@ -1,5 +1,6 @@
 from .real_operation_module import *
 from .complex_operation_module import *
+from ..SymmetryCNN import P4_Conv2d,P4Z2_Conv2d,V2_Conv2d,H2_Conv2d
 
 def config_list(size,stride):
     # generate all conv type for
@@ -46,6 +47,18 @@ OPS = {
     "[cplx]sep_conv_7x7": lambda C, stride, affine: CplxSepConv(C, C, 7, stride, 3, affine=affine),
     "[cplx]dil_conv_3x3": lambda C, stride, affine: CplxDilConv(C, C, 3, stride, 2, 2, affine=affine),
     "[cplx]dil_conv_5x5": lambda C, stride, affine: CplxDilConv(C, C, 5, stride, 4, 2, affine=affine),
+    "[symP4]sep_conv_3x3": lambda C, stride, affine: sym_op.SepConv(C, C, 3, stride, 1, CNNModule=P4_Conv2d, affine=affine),
+    "[symP4]sep_conv_3x3": lambda C, stride, affine: SepConv(C, C, 3, stride, 1, CNNModule=P4_Conv2d, affine=affine),
+    "[symP4]sep_conv_5x5": lambda C, stride, affine: SepConv(C, C, 5, stride, 2, CNNModule=P4_Conv2d, affine=affine),
+    "[symP4]sep_conv_7x7": lambda C, stride, affine: SepConv(C, C, 7, stride, 3, CNNModule=P4_Conv2d, affine=affine),
+    "[symP4]dil_conv_3x3": lambda C, stride, affine: DilConv(C, C, 3, stride, 2, CNNModule=P4_Conv2d, affine=affine),
+    "[symP4]dil_conv_5x5": lambda C, stride, affine: DilConv(C, C, 5, stride, 4, CNNModule=P4_Conv2d, affine=affine),
+    "[symP4Z2]sep_conv_3x3": lambda C, stride, affine: SepConv(C, C, 3, stride, 1, CNNModule=P4Z2_Conv2d, affine=affine),
+    "[symP4Z2]sep_conv_5x5": lambda C, stride, affine: SepConv(C, C, 5, stride, 2, CNNModule=P4Z2_Conv2d, affine=affine),
+    "[symP4Z2]sep_conv_7x7": lambda C, stride, affine: SepConv(C, C, 7, stride, 3, CNNModule=P4Z2_Conv2d, affine=affine),
+    "[symP4Z2]dil_conv_3x3": lambda C, stride, affine: DilConv(C, C, 3, stride, 2, CNNModule=P4Z2_Conv2d, affine=affine),
+    "[symP4Z2]dil_conv_5x5": lambda C, stride, affine: DilConv(C, C, 5, stride, 4, CNNModule=P4Z2_Conv2d, affine=affine),
+
 }
 
 

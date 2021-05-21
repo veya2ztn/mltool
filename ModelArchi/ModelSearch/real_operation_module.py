@@ -4,29 +4,29 @@ import torch.nn.functional as F
 from torch.nn.modules.batchnorm import _BatchNorm
 
 class ReLUcclConvBN(nn.Module):
-    def __init__(self, C_in, C_out, k, s, d, circularQ=True,affine=True):
+    def __init__(self, C_in, C_out, k, s, d, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU,circularQ=True,affine=True):
         super(ReLUcclConvBN, self).__init__()
         pp = ((k-1)*d+1-s)//2
         pp = 2*pp if (float(torch.__version__[:3]) < 1.5 and circularQ) else pp
 
         self.op = nn.Sequential(
-          nn.ReLU(inplace=False),
-          nn.Conv2d(C_in, C_out, k, stride=s, padding=pp,dilation=d, bias=False,padding_mode="circular" if circularQ else 'zeros'),
+          Nonlinear(inplace=False),
+          CNNModule(C_in, C_out, k, stride=s, padding=pp,dilation=d, bias=False,padding_mode="circular" if circularQ else 'zeros'),
           AdaptiveBatchNorm2d(C_out, affine=affine)
         )
 
     def forward(self, x):
         return self.op(x)
 class ReLUcclConvBNWrapper:
-    def __init__(self,k,s,d,Q):
+    def __init__(self,k,s,d,Q,CNNModule=nn.Conv2d,Nonlinear=nn.ReLU):
         self.k      = k
         self.s      = s
         self.d      = d
         self.Q      = Q
-
+        self.CNNModule=CNNModule
+        self.Nonlinear=Nonlinear
     def __call__(self,C,stride,affine):
-        return ReLUcclConvBN(C,C,self.k,self.s,self.d,circularQ=self.Q,affine=affine)
-
+        return ReLUcclConvBN(C,C,self.k,self.s,self.d, CNNModule=self.CNNModule,Nonlinear=self.Nonlinear,circularQ=self.Q,affine=affine)
 class AdaptiveBatchNorm2d(_BatchNorm):
     def _check_input_dim(self, input):
         if input.dim() != 4:
@@ -70,44 +70,41 @@ class AdaptiveBatchNorm2d(_BatchNorm):
             self.running_var if not self.training or self.track_running_stats else None,
             self.weight, self.bias, bn_training, exponential_average_factor, self.eps)
 
+
 class ReLUConvBN(nn.Module):
-  def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+  def __init__(self, C_in, C_out, kernel_size, stride, padding, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True):
     super(ReLUConvBN, self).__init__()
     self.op = nn.Sequential(
-      nn.ReLU(inplace=False),
-      nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
+      Nonlinear(inplace=False),
+      CNNModule(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
       AdaptiveBatchNorm2d(C_out, affine=affine)
     )
   def forward(self, x):
     return self.op(x)
 class DilConv(nn.Module):
-
-  def __init__(self, C_in, C_out, kernel_size, stride, padding, dilation, affine=True):
+  def __init__(self, C_in, C_out, kernel_size, stride, padding, dilation=2, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True):
     super(DilConv, self).__init__()
     self.op = nn.Sequential(
-      nn.ReLU(inplace=False),
-      nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=C_in, bias=False),
-      nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+      Nonlinear(inplace=False),
+      CNNModule(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=C_in, bias=False),
+      CNNModule(C_in, C_out, kernel_size=1, padding=0, bias=False),
       AdaptiveBatchNorm2d(C_out, affine=affine),
       )
-
   def forward(self, x):
     return self.op(x)
 class SepConv(nn.Module):
-
-  def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+  def __init__(self, C_in, C_out, kernel_size, stride, padding, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True):
     super(SepConv, self).__init__()
     self.op = nn.Sequential(
-      nn.ReLU(inplace=False),
-      nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, groups=C_in, bias=False),
-      nn.Conv2d(C_in, C_in, kernel_size=1, padding=0, bias=False),
+      Nonlinear(inplace=False),
+      CNNModule(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, groups=C_in, bias=False),
+      CNNModule(C_in, C_in, kernel_size=1, padding=0, bias=False),
       AdaptiveBatchNorm2d(C_in, affine=affine),
-      nn.ReLU(inplace=False),
-      nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=1, padding=padding, groups=C_in, bias=False),
-      nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+      Nonlinear(inplace=False),
+      CNNModule(C_in, C_in, kernel_size=kernel_size, stride=1, padding=padding, groups=C_in, bias=False),
+      CNNModule(C_in, C_out, kernel_size=1, padding=0, bias=False),
       AdaptiveBatchNorm2d(C_out, affine=affine),
       )
-
   def forward(self, x):
     return self.op(x)
 class Identity(nn.Module):
@@ -124,15 +121,13 @@ class Zero(nn.Module):
       return x.mul(0.)
     return x[:,:,::self.stride,::self.stride].mul(0.)
 class FactorizedReduce(nn.Module):
-
-  def __init__(self, C_in, C_out, affine=True):
+  def __init__(self, C_in, C_out, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True):
     super(FactorizedReduce, self).__init__()
     assert C_out % 2 == 0
-    self.relu = nn.ReLU(inplace=False)
-    self.conv_1 = nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False)
-    self.conv_2 = nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False)
+    self.relu = Nonlinear(inplace=False)
+    self.conv_1 = CNNModule(C_in, C_out // 2, 1, stride=2, padding=0, bias=False)
+    self.conv_2 = CNNModule(C_in, C_out // 2, 1, stride=2, padding=0, bias=False)
     self.bn = AdaptiveBatchNorm2d(C_out, affine=affine)
-
   def forward(self, x):
     x = self.relu(x)
     out = torch.cat([self.conv_1(x), self.conv_2(x[:,:,1:,1:])], dim=1)

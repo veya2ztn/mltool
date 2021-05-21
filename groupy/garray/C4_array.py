@@ -27,7 +27,7 @@ class C4Array(MatrixGArray):
         r = int_data[..., 0]
         out = np.zeros(int_data.shape[:-1] + (2, 2), dtype=np.int)
         out[..., 0, 0] = np.cos(0.5 * np.pi * r)
-        out[..., 0, 1] = -np.sin(0.5 * np.pi * r)
+        out[..., 0, 1] =-np.sin(0.5 * np.pi * r)
         out[..., 1, 0] = np.sin(0.5 * np.pi * r)
         out[..., 1, 1] = np.cos(0.5 * np.pi * r)
         return out

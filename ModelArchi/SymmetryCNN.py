@@ -4,16 +4,43 @@ import torch.nn.functional as F
 import torch
 import math
 from torch.nn.modules.utils import _pair
-from ..groupy.gconv.make_gconv_indices import *
+#from ..groupy.gconv.make_gconv_indices import *
 from torch.nn import Conv2d
 
-make_indices_functions = {(1, 4): make_c4_z2_indices,
-                          (4, 4): make_c4_p4_indices,
-                          (1, 8): make_d4_z2_indices,
-                          (8, 8): make_d4_p4m_indices}
+class fliprot90:
+    def __init__(self,rot_times,flip):
+        self.rot_times = rot_times
+        self.flip      = flip
+    def __call__(self,data):
+        data = np.flip(data,-2) if self.flip else data
+        data = np.rot90(data,self.rot_times,(-2,-1))
+        return data
+    def __repr__(self):
+        return f"do flip {self.flip} times and rotate 90 degree {self.rot_times} times"
+GroupV2  = [fliprot90(0,0) , fliprot90(0,1)]
+GroupH2  = [fliprot90(0,0) , fliprot90(2,1)]
+GroupP4  = [fliprot90(i,0) for i in range(4)]
+GroupP4Z2= [fliprot90(i,flipQ) for i in range(4) for flipQ in [0,1]]
+
+def object2slice(x):
+    return np.unravel_index(np.argsort(x, axis=None), x.shape)
+
+def get_slice_for_Group(ksize,Group):
+    ksize       = _pair(ksize)
+    the_object  = np.arange(np.prod(ksize)).reshape(*ksize)
+    inds        = np.concatenate([object2slice(group(the_object)) for group in Group],1)
+    return inds
 
 
 def trans_filter(w, inds):
+    w_indexed = w[..., inds_reshape[0].tolist(), inds_reshape[1].tolist()]
+    w_indexed = w_indexed.view(w.size(0), w.size(1),-1, w.size(-2), w.size(-1))
+    w_indexed = w_indexed.permute(0, 2, 1, 3, 4).contiguous()
+    w_indexed = w_indexed.view(w_indexed.size(0)*w_indexed.size(1),w_indexed.size(2),w_indexed.size(3),w_indexed.size(4))
+    return w_indexed
+
+def trans_filter_old(w, inds):
+    # for groupy usage
     inds_reshape = inds.reshape((-1, inds.shape[-1])).astype(np.int64)
     if len(w.shape)==4:
         w_indexed = w[..., inds_reshape[:, 1].tolist(), inds_reshape[:, 2].tolist()]
@@ -27,14 +54,10 @@ def trans_filter(w, inds):
     return w_indexed
 
 
-class D4_Conv2d(Conv2d):
-    group_num = 4
+class Symmetry_Conv2d(Conv2d):
     def __init__(self, in_channels, out_channels, kernel_size, bias=True,**kwargs):
         super().__init__(in_channels, out_channels, kernel_size,bias=bias,**kwargs)
-        self.inds  = make_indices_functions[(1,self.group_num)](kernel_size)
-
-        if bias:
-            self.bias = Parameter(torch.Tensor(out_channels*self.group_num))
+        if bias:self.bias = Parameter(torch.Tensor(out_channels*self.group_num))
         else:
             self.bias = None
             self.register_parameter('bias', None)
@@ -43,6 +66,22 @@ class D4_Conv2d(Conv2d):
         weight = trans_filter(self.weight, self.inds)
         x = F.conv2d(x, weight, self.bias, self.stride,self.padding, self.dilation, self.groups) if self.padding_mode == 'zeros' else \
             F.conv2d(F.pad(x, self._reversed_padding_repeated_twice, mode=self.padding_mode),weight, self.bias, self.stride,_pair(0), self.dilation, self.groups)
-        x  = x.view(x.shape[0],self.out_channels,self.group_num,x.shape[-2],x.shape[-1])
+        x  = x.view(x.shape[0],self.out_channels,-1,x.shape[-2],x.shape[-1])
         x  = x.mean(2)
         return x
+
+class P4_Conv2d(Symmetry_Conv2d):
+    group_num = 4
+    inds  = get_slice_for_Group(kernel_size,GroupP4)
+
+class P4Z2_Conv2d(Symmetry_Conv2d):
+    group_num = 8
+    inds      = get_slice_for_Group(kernel_size,GroupP4Z2)
+
+class V2_Conv2d(Symmetry_Conv2d):
+    group_num = 2
+    inds      = get_slice_for_Group(kernel_size,GroupV2)
+
+class H2_Conv2d(Symmetry_Conv2d):
+    group_num = 2
+    inds      = get_slice_for_Group(kernel_size,GroupH2)

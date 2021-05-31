@@ -121,8 +121,8 @@ def table(data, headers=None, format_spec=FMT, width=WIDTH, align=ALIGN, style=S
     # Number of columns in the table.
     ncols = len(data[0]) if headers is None else len(headers)
     tablestyle = STYLES[style]
-    width_max_data = max([len(d) for l in data for d in l])
-    width_max_head = max([len(d) for d in headers]) if headers is not None else 0
+    width_max_data = max([len(str(d)) for l in data for d in l])
+    width_max_head = max([len(str(d)) for d in headers]) if headers is not None else 0
     width = max(width,width_max_data,width_max_head)
     widths = parse_width(width, ncols)
 
@@ -410,7 +410,8 @@ class summary_table_info:
     def __init__(self,headers,title,rows=1):
         self.headers = headers
         self.title   = title
-        self.width   = [max(len(t)+2,10) for t in headers]
+        col_width    = len(title)//len(headers)
+        self.width   = [max(len(t)+2,10,col_width) for t in headers]
         self.width[0]= max(self.width[1:])+2
         self.rows    = rows
     def demo(self):

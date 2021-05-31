@@ -49,7 +49,8 @@ class MetricDict:
 
     def initial(self):
         accu_list = self.accu_list
-        metric_dict={'training_loss': None,"runtime":{"epoch":[]}}
+        metric_dict={'training_loss': None,"runtime":{}}
+
         for accu_type in accu_list:
             metric_dict[accu_type]                  = -1.0
             metric_dict['best_'+accu_type]          = dict([[key,np.inf] for key in self.accu_list])
@@ -58,10 +59,12 @@ class MetricDict:
 
     def update(self,value_pool,epoch):
         update_accu = {}
-        self.metric_dict["runtime"]["epoch"].append(epoch)
+        if epoch not in self.metric_dict["runtime"]:self.metric_dict["runtime"][epoch]={}
         for accu_type,val in value_pool.items():
-            if accu_type not in self.metric_dict["runtime"]:self.metric_dict["runtime"][accu_type]=[]
-            self.metric_dict["runtime"][accu_type].append(val)
+            if accu_type not in self.metric_dict["runtime"]:
+                self.metric_dict["runtime"][accu_type]={'epoch':[],'value':[]}
+            self.metric_dict["runtime"][accu_type]['value'].append(val)
+            self.metric_dict["runtime"][accu_type]['epoch'].append(epoch)
             if accu_type not in self.metric_dict:continue
             self.metric_dict[accu_type] = val
         # for accu_type in self.accu_list:

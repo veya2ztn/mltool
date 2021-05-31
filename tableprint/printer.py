@@ -20,10 +20,26 @@ from six import string_types
 from .style import LineStyle, STYLES
 from .utils import ansi_len, format_line, parse_width
 
+def isnotebook():
+    try:
+        from google import colab
+        return True
+    except: pass
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == 'ZMQInteractiveShell':
+            return True   # Jupyter notebook, Spyder or qtconsole
+        elif shell == 'TerminalInteractiveShell':
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type (?)
+    except NameError:
+        return False      # Probably standard Python interpreter
+IN_NOTEBOOK = isnotebook()
 __all__ = ('table', 'header', 'row', 'hrule', 'top', 'bottom', 'banner', 'dataframe', 'TableContext')
 
 # Defaults
-STYLE = 'round'
+STYLE = 'round' if not IN_NOTEBOOK else 'grid'
 WIDTH = 14
 FMT = '5g'
 ALIGN = 'right'
@@ -105,6 +121,9 @@ def table(data, headers=None, format_spec=FMT, width=WIDTH, align=ALIGN, style=S
     # Number of columns in the table.
     ncols = len(data[0]) if headers is None else len(headers)
     tablestyle = STYLES[style]
+    width_max_data = max([len(d) for l in data for d in l])
+    width_max_head = max([len(d) for d in headers]) if headers is not None else 0
+    width = max(width,width_max_data,width_max_head)
     widths = parse_width(width, ncols)
 
     # Initialize with a hr or the header

@@ -332,7 +332,7 @@ class NBMasterBar(MasterBar):
                     ax.set_xticks(())
                     ax.set_yticks(())
                 elif e == 'multiplot':
-                    for line in d:ax.plot(range(len(line)),line)
+                    for line in d:ax.plot(range(len(d)),d)
                 else:
                     raise NotImplementedError
                 if self.labels is not None:

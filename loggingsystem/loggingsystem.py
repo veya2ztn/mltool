@@ -7,6 +7,7 @@ import tensorboardX
 import os, random ,torch,shutil
 import numpy as np
 import torch.backends.cudnn as cudnn
+import logging,time
 
 class RNGSeed:
     def __init__(self, seed):
@@ -88,21 +89,21 @@ class MetricDict:
         for key,val in state_dict_b.items():
             if key in ["runtime"]:continue
             if key not in state_dict_a:
-                print(f"unexcepted key:{key} for your design metric ")
+                self.info(f"unexcepted key:{key} for your design metric ")
                 same_structureQ= False
             else:
                 type1 = type(val)
                 type2 = type(state_dict_a[key])
                 if type1!=type2:
-                    print(f"different type for val/key:{key} wanted{type2} but given{type1}")
+                    self.info(f"different type for val/key:{key} wanted{type2} but given{type1}")
                     same_structureQ= False
         for key,val in state_dict_a.items():
             if key in ["runtime"]:continue
             if key not in state_dict_b:
-                print(f"wanted key:{key} for your design metric ")
+                self.info(f"wanted key:{key} for your design metric ")
                 same_structureQ= False
         if not same_structureQ:
-            print("detected disaccord state dict, abort load")
+            self.info("detected disaccord state dict, abort load")
             raise
         else:
             self.metric_dict = state_dict
@@ -146,18 +147,22 @@ class LoggingSystem:
     accu_list = metric_dict = show_best_accu_types=rdn_seed = banner=None
     progress_bar =master_bar=train_bar=valid_bar   = None
     recorder = train_recorder = valid_recorder     = None
-    global_step = None
+    global_step = filelog = None
+
     def __init__(self,global_do_log,ckpt_root,gpu=0,project_name="project",seed=None,verbose=True):
-        self.global_do_log = global_do_log
-        self.diable_logbar = not global_do_log
-        self.ckpt_root     = ckpt_root
+        self.global_do_log   = global_do_log
+        self.diable_logbar   = not global_do_log
+        self.ckpt_root       = ckpt_root
         self.Q_recorder_type = 'tensorboard'
         self.Q_batch_loss_record = False
-        self.gpu_now    = gpu
+        self.gpu_now         = gpu
+        self.to_hub_info     = {}
         if seed == 'random':seed = random.randint(1, 100000)
         if isinstance(seed,int):self.set_rdn_seed(seed)
         self.seed = seed
         if verbose:print(f"log at {ckpt_root}")
+
+
 
     def set_rdn_seed(self,seed):
         self.rdn_seed = RNGSeed(seed)
@@ -171,6 +176,39 @@ class LoggingSystem:
         if not self.global_do_log:return
         self.progress_bar = self.valid_bar
         self.recorder     = self.valid_recorder
+
+    def info(self,string,show=True):
+        if self.filelog is None:
+            ckpt_root = self.ckpt_root
+            if not os.path.exists(ckpt_root):os.makedirs(ckpt_root)
+            logging.basicConfig(level    = logging.DEBUG,
+                    format   = '%(asctime)s %(message)s',
+                    datefmt  = '%m-%d %H:%M',
+                    filename = os.path.join(self.ckpt_root, 'log.txt'),
+                    filemode = 'w');
+            # define a Handler which writes INFO messages or higher to the sys.stderr
+            console = logging.StreamHandler();
+            console.setLevel(logging.INFO);
+            # set a format which is simpler for console use
+            formatter = logging.Formatter('%(asctime)s %(message)s');
+            # tell the handler to use this format
+            console.setFormatter(formatter);
+            logging.getLogger('').addHandler(console)
+            self.filelog = console
+            #
+            # filelog = logging.getLogger("")
+            # filelog.setLevel(logging.DEBUG)
+            # ckpt_root = self.ckpt_root
+            # if not os.path.exists(ckpt_root):os.makedirs(ckpt_root)
+            # handler = logging.FileHandler(os.path.join(ckpt_root, 'log.txt'))
+            # handler.setLevel(logging.DEBUG)
+            # handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+            # filelog.addHandler(handler)
+            # self.filelog = filelog
+        if show:
+            logging.info(string)
+        else:
+            logging.debug(string)
 
     def record(self,name,value,epoch):
         if not self.global_do_log:return
@@ -188,7 +226,7 @@ class LoggingSystem:
     def create_master_bar(self,batches,banner_info=None):
         if banner_info is not None and self.global_do_log:
             if banner_info == 1:banner_info = self.banner.demo()
-            print(banner_info)
+            self.info(banner_info)
         if   isinstance(batches,int):batches=range(batches)
         elif isinstance(batches,list):pass
         else:raise NotImplementedError
@@ -219,6 +257,8 @@ class LoggingSystem:
 
     def create_web_inference(self,log_dir,hparam_dict=None,metric_dict=None):
         if not self.global_do_log:return
+        if hparam_dict is None:return
+        self.regist({'hyparam':hparam_dict})
         exp, ssi, sei      = tensorboardX.summary.hparams(hparam_dict, metric_dict)
         self.recorder      = SummaryWriter(logdir= log_dir)
         self.recorder.file_writer.add_summary(exp)
@@ -226,6 +266,15 @@ class LoggingSystem:
         self.recorder.file_writer.add_summary(sei)
         return self.recorder
 
+    def regist(self,_dict):
+        for key,val in _dict.items():
+            self.to_hub_info[key]=val
+    def send_info_to_hub(self,hubfile):
+        if 'score' not in self.to_hub_info:
+            self.to_hub_info['score'] = self.metric_dict.metric_dict['best_'+self.accu_list[0]][self.accu_list[0]]
+        timenow = time.asctime( time.localtime(time.time()))
+        info_string = f"{timenow} {self.to_hub_info['task']} {self.to_hub_info['score']} {self.ckpt_root}\n"
+        with open(hubfile,'a') as f:f.write(info_string)
     def complete_the_ckpt(self,checkpointer,optimizer=None):
         '''
         checkpointer = {
@@ -276,10 +325,10 @@ class LoggingSystem:
         else:
             checkpointer = self.complete_the_ckpt(checkpointer)
             state_dict = torch.load(path)
-            print("need reload key:");print(checkpointer.keys())
-            print("has key:");print(state_dict.keys())
+            self.info("need reload key:");self.info(checkpointer.keys())
+            self.info("has key:");self.info(state_dict.keys())
             for key in checkpointer:
-                print(f"reload {key}")
+                self.info(f"reload {key}")
                 checkpointer[key].load_state_dict(state_dict[key])
             last_epoch = state_dict['epoch']
         return last_epoch
@@ -327,12 +376,14 @@ class LoggingSystem:
         return self.metric_dict
 
     def banner_initial(self,epoches,FULLNAME,training_loss_trace=['loss'],show_best_accu_types=None,print_once=True):
-        print("initialize the log banner")
+        self.info("initialize the log banner")
         self.show_best_accu_types = self.accu_list if show_best_accu_types is None else show_best_accu_types
         assert isinstance(self.show_best_accu_types,list)
+        self.epoches= epoches
         header      = [f'epoches:{epoches}']+self.accu_list+training_loss_trace
         self.banner = summary_table_info(header,FULLNAME,rows=len(self.show_best_accu_types)+1)
-        if print_once:print("\n".join(self.banner_str(0,FULLNAME)))
+        if print_once:print("\n".join(self.banner_str(0,FULLNAME)[0] ))
+        #use tqdm as backend to info table string. This table string will not access in log.txt file
         return self.banner
 
     def banner_str(self,epoch,FULLNAME,train_losses=[-1]):
@@ -340,6 +391,8 @@ class LoggingSystem:
         assert self.metric_dict is not None
         metric_dict = self.metric_dict.state_dict()
         accu_list   = self.accu_list
+        shut_cut    = " ".join(["{:.4f}".format(s) for s in [metric_dict[key] for key in accu_list]+train_losses])
+        shut_cut    = "epoch:{0:04d}/{0:04d} ".format(epoch+1,self.epoches) + shut_cut
         rows        = []
         show_row_run= [f"epoch:{epoch+1}"]+[metric_dict[key] for key in accu_list]+train_losses
         rows       += [show_row_run]
@@ -350,7 +403,9 @@ class LoggingSystem:
             rows+=[show_row_temp]
 
         outstring =  self.banner.show(rows,title=FULLNAME)
-        return outstring
+
+        return outstring,shut_cut
     def banner_show(self,epoch,FULLNAME,train_losses=[-1]):
-        outstring = self.banner_str(epoch,FULLNAME,train_losses)
+        outstring,shut_cut = self.banner_str(epoch,FULLNAME,train_losses)
         self.runtime_log_table(outstring)
+        self.info(shut_cut,show=False)

@@ -605,7 +605,7 @@ class ModelSaver:
     def get_model_ckpt(self,checkpointer,epoch,mode='full'):
         '''
         checkpointer = {
-            "rng_seed": self.rdn_seed.get_save_states(),
+            "rng_seed": self.rdn_seed.state_dict(),
             "optimizer": optimizer.state_dict(),
             "model": model.state_dict(),
         }

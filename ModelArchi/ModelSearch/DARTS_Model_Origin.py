@@ -121,11 +121,28 @@ class AuxiliaryHeadImageNet(nn.Module):
         x = self.classifier(x.view(x.size(0), -1))
         return x
 
-
+#Genotype = namedtuple("Genotype", "normal normal_concat reduce reduce_concat init_channels num_classes layers nodes")
 class Network(nn.Module):
-    def __init__(self, C, num_classes, nodes,layers, auxiliary=False, genotype=None,**kargs):
+    def __init__(self, C=None, num_classes=None, nodes=None,layers=None, auxiliary=False, genotype=None,**kargs):
         super(Network, self).__init__()
         assert genotype is not None
+        if isinstance(genotype,str):
+            #read from file
+            pass
+
+        if C is None: C=genotype.init_channels
+        else:assert (not hasattr(genotype,'init_channels')) or C==genotype.init_channels
+
+        if num_classes is None: num_classes=genotype.num_classes
+        else:assert (not hasattr(genotype,'num_classes')) or num_classes==genotype.num_classes
+
+        if nodes is None: nodes=genotype.nodes
+        else:assert (not hasattr(genotype,'nodes')) or  nodes==genotype.nodes
+
+        if layers is None: layers=genotype.layers
+        else:assert (not hasattr(genotype,'layers')) or  layers==genotype.layers 
+
+
         self._layers = layers
         self._auxiliary = auxiliary
         self.drop_path_prob = 0 ### NOTE: the origin train code will active use dropout

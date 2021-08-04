@@ -4,7 +4,7 @@ from warnings import warn
 import shutil,os
 import tqdm
 import numpy as np
-
+import io
 #__all__ = ['master_bar', 'progress_bar', 'IN_NOTEBOOK']
 
 CLEAR_OUTPUT = True
@@ -370,10 +370,11 @@ class tqdmBar(tqdm.tqdm):
         self.set_description(text)
 
     @classmethod
-    def write_table(self, table, num,offset=0,end="\n", nolock=False):
+    def write_table(self, table, num=2,offset=0,end="\n", nolock=False):
         """
         Print a message via tqdm (without overlap with bars)
         """
+
         tqdm.tqdm.write(magic_char * (len(table)+1), end="")
         for line in table:tqdm.tqdm.write(line)
 
@@ -413,6 +414,23 @@ def print_and_maybe_save(line,end=None):
 
 def printing():
     return False if NO_BAR else (stdout.isatty() or IN_NOTEBOOK)
+
+class TqdmToLogger(io.StringIO):
+    """
+        Output stream for TQDM which will output to logger module instead of
+        the StdOut.
+    """
+    logger = None
+    level = None
+    buf = ''
+    def __init__(self,logger,level=None):
+        super(TqdmToLogger, self).__init__()
+        self.logger = logger
+        self.level = level or logging.INFO
+    def write(self,buf):
+        self.buf = buf + magic_char
+    def flush(self):
+        self.logger.log(self.level, self.buf)
 
 if IN_NOTEBOOK: master_bar, progress_bar = NBMasterBar, NBProgressBar
 else:           master_bar, progress_bar = tqdmBar, tqdmBar

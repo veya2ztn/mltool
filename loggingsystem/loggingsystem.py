@@ -1,7 +1,7 @@
 from .MLlog import ModelSaver,AverageMeter,RecordLoss,Curve_data,IdentyMeter,LossStores
-from ..fastprogress import master_bar, progress_bar,isnotebook
+from ..fastprogress import master_bar, progress_bar,isnotebook,TqdmToLogger
 from ..tableprint.printer import summary_table_info
-
+from tqdm.contrib.logging import logging_redirect_tqdm
 from tensorboardX import SummaryWriter
 import tensorboardX
 import os, random ,torch,shutil
@@ -147,9 +147,9 @@ class LoggingSystem:
     accu_list = metric_dict = show_best_accu_types=rdn_seed = banner=None
     progress_bar =master_bar=train_bar=valid_bar   = None
     recorder = train_recorder = valid_recorder     = None
-    global_step = filelog = None
+    global_step = filelog = bar_log = None
 
-    def __init__(self,global_do_log,ckpt_root,gpu=0,project_name="project",seed=None,verbose=True):
+    def __init__(self,global_do_log,ckpt_root,info_log_path=None,bar_log_path=None,gpu=0,project_name="project",seed=None,verbose=True):
         self.global_do_log   = global_do_log
         self.diable_logbar   = not global_do_log
         self.ckpt_root       = ckpt_root
@@ -161,9 +161,8 @@ class LoggingSystem:
         if isinstance(seed,int):self.set_rdn_seed(seed)
         self.seed = seed
         if verbose:print(f"log at {ckpt_root}")
-
-
-
+        self.info_log_path = os.path.join(self.ckpt_root, 'log.info') if info_log_path is None else info_log_path
+        self.bar_log_path = 'bar.logging.info' if bar_log_path is None else bar_log_path
     def set_rdn_seed(self,seed):
         self.rdn_seed = RNGSeed(seed)
 
@@ -179,12 +178,12 @@ class LoggingSystem:
 
     def info(self,string,show=True):
         if self.filelog is None:
-            ckpt_root = self.ckpt_root
-            if not os.path.exists(ckpt_root):os.makedirs(ckpt_root)
+            info_dir,info_file = os.path.split(self.info_log_path)
+            if info_dir and not os.path.exists(info_dir):os.makedirs(info_dir)
             logging.basicConfig(level    = logging.DEBUG,
                     format   = '%(asctime)s %(message)s',
                     datefmt  = '%m-%d %H:%M',
-                    filename = os.path.join(self.ckpt_root, 'log.txt'),
+                    filename = self.info_log_path,
                     filemode = 'w');
             # define a Handler which writes INFO messages or higher to the sys.stderr
             console = logging.StreamHandler();
@@ -210,6 +209,7 @@ class LoggingSystem:
         else:
             logging.debug(string)
 
+
     def record(self,name,value,epoch):
         if not self.global_do_log:return
         if self.Q_recorder_type == 'tensorboard':
@@ -224,20 +224,36 @@ class LoggingSystem:
             self.recorder.add_figure(name,figure,epoch)
 
     def create_master_bar(self,batches,banner_info=None):
+        if self.bar_log is None and (not isnotebook()):
+            print(f"the bar log will also save in {self.bar_log_path}")
+            info_dir,info_file = os.path.split(self.bar_log_path)
+            if info_dir and not os.path.exists(info_dir):os.makedirs(info_dir)
+            bar_log = logging.getLogger("progress_bar")
+            bar_log.setLevel(logging.DEBUG)
+            handler = logging.FileHandler(self.bar_log_path)
+            handler.setLevel(logging.DEBUG)
+            handler.setFormatter(logging.Formatter('%(message)s'))
+            bar_log.addHandler(handler)
+            bar_log.addHandler(logging.StreamHandler())
+            self.bar_log=bar_log
+            self.tqdm_out = TqdmToLogger(self.bar_log,level=logging.DEBUG)
+
         if banner_info is not None and self.global_do_log:
             if banner_info == 1:banner_info = self.banner.demo()
             self.info(banner_info)
         if   isinstance(batches,int):batches=range(batches)
         elif isinstance(batches,list):pass
         else:raise NotImplementedError
-        self.master_bar = master_bar(batches, disable=self.diable_logbar)
+
+        self.master_bar = master_bar(batches,file=self.tqdm_out,bar_format="{l_bar}{bar:30}{r_bar}{bar:-10b}", disable=self.diable_logbar)
         return self.master_bar
 
     def create_progress_bar(self,batches,force=False,**kargs):
         if self.progress_bar is not None and not force:
             _=self.progress_bar.restart(total=batches)
         else:
-            self.progress_bar = progress_bar(range(batches), disable=self.diable_logbar,parent=self.master_bar,**kargs)
+            self.progress_bar = progress_bar(range(batches),file=self.tqdm_out,bar_format="{l_bar}{bar:30}{r_bar}{bar:-10b}",
+                                             disable=self.diable_logbar,parent=self.master_bar,**kargs)
         return self.progress_bar
 
     def create_model_saver(self,path=None,accu_list=None,**kargs):
@@ -269,12 +285,14 @@ class LoggingSystem:
     def regist(self,_dict):
         for key,val in _dict.items():
             self.to_hub_info[key]=val
+
     def send_info_to_hub(self,hubfile):
         if 'score' not in self.to_hub_info:
             self.to_hub_info['score'] = self.metric_dict.metric_dict['best_'+self.accu_list[0]][self.accu_list[0]]
         timenow = time.asctime( time.localtime(time.time()))
         info_string = f"{timenow} {self.to_hub_info['task']} {self.to_hub_info['score']} {self.ckpt_root}\n"
         with open(hubfile,'a') as f:f.write(info_string)
+
     def complete_the_ckpt(self,checkpointer,optimizer=None):
         '''
         checkpointer = {
@@ -346,8 +364,12 @@ class LoggingSystem:
 
     def runtime_log_table(self,table_string):
         if not self.global_do_log:return
-        self.master_bar.write_table(table_string,2,4)
-
+        if self.bar_log is None:
+            self.master_bar.write_table(table_string,2,4)
+        else:
+            magic_char = "\033[F"
+            self.bar_log.info(magic_char * (len(table_string)+2))
+            for line in table_string:self.bar_log.info(line)
     def batch_loss_record(self,loss_list):
         if not self.global_do_log:return
         if self.Q_batch_loss_record:
@@ -383,7 +405,7 @@ class LoggingSystem:
         header      = [f'epoches:{epoches}']+self.accu_list+training_loss_trace
         self.banner = summary_table_info(header,FULLNAME,rows=len(self.show_best_accu_types)+1)
         if print_once:print("\n".join(self.banner_str(0,FULLNAME)[0] ))
-        #use tqdm as backend to info table string. This table string will not access in log.txt file
+
         return self.banner
 
     def banner_str(self,epoch,FULLNAME,train_losses=[-1]):
@@ -409,3 +431,28 @@ class LoggingSystem:
         outstring,shut_cut = self.banner_str(epoch,FULLNAME,train_losses)
         self.runtime_log_table(outstring)
         self.info(shut_cut,show=False)
+
+if __name__ == "__main__":
+    logsys            = LoggingSystem(True,'test')
+    epoches = 20
+    FULLNAME= "TEST"
+
+    master_bar        = logsys.create_master_bar(epoches)
+    metric_dict       = logsys.initial_metric_dict(['a','b','c'])
+    metric_dict       = metric_dict.metric_dict
+    _                 = logsys.create_recorder(hparam_dict={},metric_dict=metric_dict)
+    logsys.train_bar  = logsys.create_progress_bar(1)
+    logsys.valid_bar  = logsys.create_progress_bar(1)
+    banner            = logsys.banner_initial(epoches,FULLNAME)
+    for epoch in master_bar:
+        logsys.train()
+        inter_b    = logsys.create_progress_bar(20)
+        while inter_b.update_step():time.sleep(0.2)
+        logsys.eval()
+        inter_b    = logsys.create_progress_bar(20)
+        while inter_b.update_step():time.sleep(0.2)
+        update_accu    = logsys.metric_dict.update({'a':np.random.random(),
+                                                    'b':np.random.random(),
+                                                    'c':np.random.random()},
+                                                    epoch)
+        logsys.banner_show(epoch,FULLNAME,train_losses=[np.random.random()])

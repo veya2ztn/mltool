@@ -21,11 +21,11 @@ receivers = ['645506775@qq.com']
 #邮件内容设置
 CONStatusRecorder=".ConnectionStatus.json"
 def send_message(text,mode):
-    
+
     if os.path.exists(CONStatusRecorder):
         connection = read_json(CONStatusRecorder)["status"]
     else:
-        connection = 1
+        connection = 0
     if connection < 1:return
 
     if mode in ['success','fail'] :

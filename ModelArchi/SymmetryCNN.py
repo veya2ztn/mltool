@@ -87,3 +87,19 @@ class V2_Conv2d(Symmetry_Conv2d):
 class H2_Conv2d(Symmetry_Conv2d):
     group_num = 2
     Group     = GroupH2
+
+SymmetryCNNPool={"P4":P4_Conv2d,'P4Z2':P4Z2_Conv2d,'V2':V2_Conv2d,'H2':H2_Conv2d}
+def cnn2symmetrycnn(module,type='P4Z2'):
+    module_output = module
+    if isinstance(module, Conv2d):
+        module_output = SymmetryCNNPool[type](in_channels =module.in_channels ,
+                                        out_channels=module.out_channels,
+                                        kernel_size =module.kernel_size ,
+                                        stride      =module.stride      ,
+                                        padding     =module.padding     ,
+                                        dilation    =module.dilation    ,
+                                        bias        =False if module.bias is None else True)
+    for name, child in module.named_children():
+        module_output.add_module(name, CNN2SYMCNN(child,type))
+    del module
+    return module_output

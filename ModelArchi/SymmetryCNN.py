@@ -100,6 +100,6 @@ def cnn2symmetrycnn(module,type='P4Z2'):
                                         dilation    =module.dilation    ,
                                         bias        =False if module.bias is None else True)
     for name, child in module.named_children():
-        module_output.add_module(name, CNN2SYMCNN(child,type))
+        module_output.add_module(name, cnn2symmetrycnn(child,type))
     del module
     return module_output

@@ -60,7 +60,7 @@ class TriangleScheduler(_LRScheduler):
             self.increase = False
             self.counter  = 0
 
-    def step(self, loss, epoch=None):
+    def step(self, loss=None, epoch=None):
         # convert `metrics` to float, in case it's a zero-dim Tensor
         if epoch is None:
             epoch = self.last_epoch + 1
@@ -212,7 +212,7 @@ class LinearUpThenTriPower(_LRScheduler):
             self.base_lrs = [group['lr'] for group in self.optimizer.param_groups]
             self.start_epoch = self.last_epoch
 
-    def step(self, loss, epoch=None):
+    def step(self, loss=None, epoch=None):
         # convert `metrics` to float, in case it's a zero-dim Tensor
         self.last_epoch  = self.last_epoch + 1 if epoch is None else epoch
         self.update_lr_state(loss)

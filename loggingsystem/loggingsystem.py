@@ -1,4 +1,4 @@
-from .MLlog import ModelSaver,AverageMeter,RecordLoss,Curve_data,IdentyMeter,LossStores
+from .MLlog import ModelSaver,AverageMeter,RecordLoss,Curve_data,IdentyMeter,LossStores,anomal_detect
 from ..fastprogress import master_bar, progress_bar,isnotebook,TqdmToLogger
 from ..tableprint.printer import summary_table_info
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -251,10 +251,12 @@ class LoggingSystem:
                                              disable=self.diable_logbar,parent=self.master_bar,**kargs)
         return self.progress_bar
 
-    def create_model_saver(self,path=None,accu_list=None,**kargs):
+    def create_model_saver(self,path=None,accu_list=None,earlystop_config={},
+                                anormal_d_config={},**kargs):
         if not self.global_do_log:return
         self.saver_path  = os.path.join(self.ckpt_root,'saver') if not path else path
-        self.model_saver = ModelSaver(self.saver_path,accu_list,**kargs)
+        self.model_saver = ModelSaver(self.saver_path,accu_list,**(earlystop_config.config),**kargs)
+        self.anomal_detecter =anomal_detect(**(anormal_d_config['config']))
 
     def create_recorder(self,**kargs):
         if not self.global_do_log:return
@@ -316,14 +318,17 @@ class LoggingSystem:
         model = model.module if hasattr(model,'module') else model
         return self.model_saver.save_best_model(model,accu_pool,epoch,**kargs)
 
-    def save_latest_ckpt(self,checkpointer,epoch,optimizer=None,**kargs):
+    def save_latest_ckpt(self,checkpointer,epoch,train_loss,saveQ=True, optimizer=None,**kargs):
         if not self.global_do_log:return
-        assert checkpointer is not None
-        if isinstance(checkpointer,dict):
-            checkpointer = self.complete_the_ckpt(checkpointer,optimizer=optimizer)
-        else:
-            checkpointer = checkpointer.module if hasattr(checkpointer,'module') else checkpointer
-        self.model_saver.save_latest_model(checkpointer,epoch,**kargs)
+        bad_condition_happen = self.anomal_detecter.step(train_loss)
+        if saveQ or bad_condition_happen:
+            assert checkpointer is not None
+            if isinstance(checkpointer,dict):
+                checkpointer = self.complete_the_ckpt(checkpointer,optimizer=optimizer)
+            else:
+                checkpointer = checkpointer.module if hasattr(checkpointer,'module') else checkpointer
+            self.model_saver.save_latest_model(checkpointer,epoch,**kargs)
+        return bad_condition_happen
 
     def load_checkpoint(self,checkpointer,path):
         assert 'model' in checkpointer

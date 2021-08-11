@@ -317,6 +317,28 @@ class LossStores:
 import time
 
 
+class anomal_detect:
+    def __init__(self, stop_counting=10,wall_value=0.8, delta_unit = 1e-4):
+        self.last_train_loss = None
+        self.anomal_count    = 0
+        self.decrease_count  = 0
+        self.wall_value      = wall_value
+        self.delta_unit      = delta_unit
+        self.stop_counting   = stop_counting
+    def step(self,train_loss):
+        if self.last_train_loss is None:
+            self.last_train_loss = train_loss
+            return False
+
+        delta_train_loss = abs(train_loss-self.last_train_loss)
+        #if delta_train_loss>0.8:return True
+        if self.wall_value > 0.8 or self.delta_unit<1e-3:
+            self.anomal_count+=1
+        else:
+            self.anomal_count = 0
+        if self.anomal_count > self.stop_counting:return True
+        self.last_train_loss = train_loss
+        return False
 
 class ModelSaver_V1:
     '''

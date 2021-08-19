@@ -332,7 +332,7 @@ class anomal_detect:
 
         delta_train_loss = abs(train_loss-self.last_train_loss)
         #if delta_train_loss>0.8:return True
-        if self.wall_value > 0.8 or self.delta_unit<1e-3:
+        if self.wall_value > 0.8 or self.delta_unit<1e-8:
             self.anomal_count+=1
         else:
             self.anomal_count = 0

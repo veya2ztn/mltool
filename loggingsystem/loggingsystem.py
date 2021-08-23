@@ -163,6 +163,7 @@ class LoggingSystem:
         if verbose:print(f"log at {ckpt_root}")
         self.info_log_path = os.path.join(self.ckpt_root, 'log.info') if info_log_path is None else info_log_path
         self.bar_log_path = 'bar.logging.info' if bar_log_path is None else bar_log_path
+
     def set_rdn_seed(self,seed):
         self.rdn_seed = RNGSeed(seed)
 

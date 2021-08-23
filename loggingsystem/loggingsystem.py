@@ -147,7 +147,7 @@ class LoggingSystem:
     accu_list = metric_dict = show_best_accu_types=rdn_seed = banner=None
     progress_bar =master_bar=train_bar=valid_bar   = None
     recorder = train_recorder = valid_recorder     = None
-    global_step = console = bar_log = tqdm_out  =None
+    global_step = console = bar_log =file_logger= tqdm_out  =None
 
     def __init__(self,global_do_log,ckpt_root,info_log_path=None,bar_log_path=None,gpu=0,project_name="project",seed=None,verbose=True):
         self.global_do_log   = global_do_log
@@ -178,27 +178,33 @@ class LoggingSystem:
         self.recorder     = self.valid_recorder
 
     def info(self,string,show=True):
-        if self.console is None:
+
+        if self.file_logger is None:
+
             info_dir,info_file = os.path.split(self.info_log_path)
             if info_dir and not os.path.exists(info_dir):os.makedirs(info_dir)
-            logging.basicConfig(level    = logging.DEBUG,
-                    format   = '%(asctime)s %(message)s',
-                    datefmt  = '%m-%d %H:%M',
-                    filename = self.info_log_path,
-                    filemode = 'w');
-            # define a Handler which writes INFO messages or higher to the sys.stderr
 
-            console = logging.StreamHandler();
-            console.setLevel(logging.WARN)
-            console.setFormatter(logging.Formatter('%(message)s'))
-            logging.getLogger('').addHandler(console)
+            file_log = logging.getLogger("information_file_log")
 
-            #self.console = console
+            if (file_log.hasHandlers()):file_log.handlers.clear()# Important!!
+
+            file_log.setLevel(logging.DEBUG)
+            handler = logging.FileHandler(self.info_log_path)
+            handler.setLevel(logging.DEBUG)
+            handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+            file_log.addHandler(handler)
+
+            console_handle = logging.StreamHandler();
+            console_handle.setLevel(logging.WARNING)
+            console_handle.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+            file_log.addHandler(console_handle)
+
+            self.file_log = file_log
 
         if show:
-            logging.warn(string)
+            self.file_log.warn(string)
         else:
-            logging.debug(string)
+            self.file_log.info(string)
 
 
     def record(self,name,value,epoch):
@@ -216,10 +222,11 @@ class LoggingSystem:
 
     def create_master_bar(self,batches,banner_info=None):
         if self.bar_log is None and (not isnotebook()):
-            print(f"the bar log will also save in {self.bar_log_path}")
+            self.info(f"the bar log will also save in {self.bar_log_path}")
             info_dir,info_file = os.path.split(self.bar_log_path)
             if info_dir and not os.path.exists(info_dir):os.makedirs(info_dir)
             bar_log = logging.getLogger("progress_bar")
+            if (bar_log.hasHandlers()):bar_log.handlers.clear()# Important!!
             bar_log.setLevel(logging.DEBUG)
 
             handler = logging.FileHandler(self.bar_log_path)
@@ -230,6 +237,7 @@ class LoggingSystem:
             console = logging.StreamHandler();
             console.setFormatter(logging.Formatter('%(message)s'))
             bar_log.addHandler(console)
+
             self.bar_log  = bar_log
             self.tqdm_out = TqdmToLogger(self.bar_log,level=logging.DEBUG)
 

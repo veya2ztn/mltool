@@ -327,7 +327,7 @@ class LoggingSystem:
         model = model.module if hasattr(model,'module') else model
         return self.model_saver.save_best_model(model,accu_pool,epoch,**kargs)
 
-    def save_latest_ckpt(self,checkpointer,epoch,train_loss,saveQ=True, optimizer=None,**kargs):
+    def save_latest_ckpt(self,checkpointer,epoch,train_loss,doearlystop=True,saveQ=True, optimizer=None,**kargs):
         if not self.global_do_log:return
         bad_condition_happen = self.anomal_detecter.step(train_loss)
         if saveQ or bad_condition_happen:
@@ -337,7 +337,7 @@ class LoggingSystem:
             else:
                 checkpointer = checkpointer.module if hasattr(checkpointer,'module') else checkpointer
             self.model_saver.save_latest_model(checkpointer,epoch,**kargs)
-        return bad_condition_happen
+        return (bad_condition_happen and doearlystop)
 
     def load_checkpoint(self,checkpointer,path):
         assert 'model' in checkpointer
@@ -436,6 +436,7 @@ class LoggingSystem:
         outstring =  self.banner.show(rows,title=FULLNAME)
 
         return outstring,shut_cut
+
     def banner_show(self,epoch,FULLNAME,train_losses=[-1]):
         outstring,shut_cut = self.banner_str(epoch,FULLNAME,train_losses)
         self.runtime_log_table(outstring)

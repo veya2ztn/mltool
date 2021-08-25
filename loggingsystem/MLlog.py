@@ -563,6 +563,9 @@ class ModelSaver:
         self.block_best_interval   = block_best_interval
 
         self.model_weight          = {}
+        self.loss_stores  = {}
+        for accu_type in self.accu_list:
+            self.loss_stores[accu_type]=LossStores()
 
         if os.path.exists(self.status_file):
             self._reload()
@@ -579,11 +582,6 @@ class ModelSaver:
         self.status['now_epoch']         = -1
         self.status['routine']           = OrderedDict()
         self.status['saved_epoch_record']= {}
-
-        self.loss_stores  = {}
-        for accu_type in self.accu_list:
-            self.loss_stores[accu_type]=LossStores()
-
         self._save_status(self.status)
 
     def _reload(self):
@@ -681,10 +679,10 @@ class ModelSaver:
             print("====> ModelSaverInfo:can not parse the start_epoch <====")
             raise
         start_epoch = int(start_epoch[0])
-        return existedweight,start_epoch
+        return os.path.join(self.routine_path,existedweight),start_epoch
 
     def get_best_model(self,key_flag=None):
-        existedweight= os.listdir(self.routine_path)
+        existedweight= os.listdir(self.best_path)
         if len(existedweight)==0:
             print('ModelSaverInfo:no best saver')
             return None
@@ -696,7 +694,7 @@ class ModelSaver:
             existedweight=existedweight[0]
         else:
             existedweight=[p for p in existedweight if key_flag in existedweight][0]
-        weight_path = os.path.join('best',existedweight)
+        weight_path = os.path.join(self.best_path,existedweight)
         return weight_path
 
     def save_best_model(self,model,accu_pool,epoch,doearlystop=True,eps=None,save_inteval=20,epoches=None,**kargs):

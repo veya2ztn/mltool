@@ -1,6 +1,6 @@
 from .real_operation_module import *
 from .complex_operation_module import *
-from ..SymmetryCNN import P4_Conv2d,P4Z2_Conv2d,V2_Conv2d,H2_Conv2d
+from ..SymmetryCNN import P4_Conv2d,P4Z2_Conv2d,V2_Conv2d,H2_Conv2d,Z2_Conv2d
 from ..TensorNetworkLayer.Conv2dMPS import embedConv2d
 def config_list(size,stride):
     # generate all conv type for
@@ -54,6 +54,15 @@ OPS = {
 "[symP4]sep_conv_7x7": lambda C, stride, affine: SepConv(C, C, 7, stride, 3, CNNModule=P4_Conv2d, affine=affine),
 "[symP4]dil_conv_3x3": lambda C, stride, affine: DilConv(C, C, 3, stride, 2, CNNModule=P4_Conv2d, affine=affine),
 "[symP4]dil_conv_5x5": lambda C, stride, affine: DilConv(C, C, 5, stride, 4, CNNModule=P4_Conv2d, affine=affine),
+
+"[symZ2]sep_conv_3x3": lambda C, stride, affine: SepConv(C, C, 3, stride, 1, CNNModule=Z2_Conv2d, affine=affine),
+"[symZ2]sep_conv_5x5": lambda C, stride, affine: SepConv(C, C, 5, stride, 2, CNNModule=Z2_Conv2d, affine=affine),
+"[symZ2]sep_conv_7x7": lambda C, stride, affine: SepConv(C, C, 7, stride, 3, CNNModule=Z2_Conv2d, affine=affine),
+"[symZ2]dil_conv_3x3": lambda C, stride, affine: DilConv(C, C, 3, stride, 2, CNNModule=Z2_Conv2d, affine=affine),
+"[symZ2]dil_conv_5x5": lambda C, stride, affine: DilConv(C, C, 5, stride, 4, CNNModule=Z2_Conv2d, affine=affine),
+
+
+
 
 "[symP4Z2]sep_conv_3x3": lambda C, stride, affine: SepConv(C, C, 3, stride, 1, CNNModule=P4Z2_Conv2d, affine=affine),
 "[symP4Z2]sep_conv_5x5": lambda C, stride, affine: SepConv(C, C, 5, stride, 2, CNNModule=P4Z2_Conv2d, affine=affine),

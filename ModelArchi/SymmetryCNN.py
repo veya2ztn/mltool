@@ -20,6 +20,7 @@ class fliprot90:
         return f"do flip {self.flip} times and rotate 90 degree {self.rot_times} times"
 GroupV2  = [fliprot90(0,0) , fliprot90(0,1)]
 GroupH2  = [fliprot90(0,0) , fliprot90(2,1)]
+GroupZ2  = [fliprot90(0,0) , fliprot90(0,1), fliprot90(2,0), fliprot90(2,1)]
 GroupP4  = [fliprot90(i,0) for i in range(4)]
 GroupP4Z2= [fliprot90(i,flipQ) for i in range(4) for flipQ in [0,1]]
 
@@ -84,11 +85,15 @@ class V2_Conv2d(Symmetry_Conv2d):
     group_num = 2
     Group     = GroupV2
 
+class Z2_Conv2d(Symmetry_Conv2d):
+    group_num = 4
+    Group     = GroupZ2
+
 class H2_Conv2d(Symmetry_Conv2d):
     group_num = 2
     Group     = GroupH2
 
-SymmetryCNNPool={"P4":P4_Conv2d,'P4Z2':P4Z2_Conv2d,'V2':V2_Conv2d,'H2':H2_Conv2d}
+SymmetryCNNPool={"P4":P4_Conv2d,'P4Z2':P4Z2_Conv2d,'V2':V2_Conv2d,'H2':H2_Conv2d,'Z2':Z2_Conv2d}
 def cnn2symmetrycnn(module,type='P4Z2'):
     module_output = module
     if isinstance(module, Conv2d):

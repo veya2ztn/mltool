@@ -284,10 +284,11 @@ class RecordLoss:
             os.remove(real_path)
 
 class LossStores:
-    def __init__(self):
+    def __init__(self, logger=None):
         self.store = collections.OrderedDict()
         self.last  = None
         self.nbm_c = 0
+        self.logger= logger
     def update(self,score,key_name):
         self.store[key_name] = score
 
@@ -301,17 +302,31 @@ class LossStores:
         sort=sorted(self.store.items(), key=lambda d: d[1])
         return sort[num-1][1]
 
-    def earlystop(self,num,eps=0.00001,max_length=30,anti_over_fit_length=50,max_tail=40,mode="no_min_more"):
+    def earlystop(self,num,eps=0.00001,es_max_window=30, anti_over_fit_length=50, max_tail=40,mode="no_min_more"):
+        lg = self.logger
         self.buffer = list(self.store.values())
         if len(self.buffer)<=max_length:return False
         window = self.buffer[-max_length:]
         if mode == "no_min_more":
-            #if num > max(window)*0.99:return True
-            if num > max(window)-eps:return True
-        if np.argmin(self.buffer) < len(self.buffer)-max_tail:return True
+            if num > max(window)-eps:
+                if lg is not None:lg.info(f'''[earlystop detected]
+                reason: the input score larger than max(window)-eps.where
+                the input num   is {num}
+                the len(window) is {len(window)}
+                the max(window) is {max(window)}
+                the eps is {eps}
+                ''')
+                return True
+        #if np.argmin(self.buffer) < len(self.buffer)-max_tail:return True
         #if min(window)>num-0.00001:return True #for real bad case
         anti_over_fit_min = self.buffer[-anti_over_fit_length:]
-        if min(anti_over_fit_min)>min(self.buffer):return True
+        if min(anti_over_fit_min)>min(self.buffer):
+            if lg is not None:lg.info(f'''[earlystop detected]
+            reason: over_fit detected min(anti_over_fit_min)>min(self.buffer).where
+            min(anti_over_fit_min)   is {min(anti_over_fit_min)}
+            min(self.buffer) is {min(self.buffer)}
+            ''')
+            return True
         return False
 
 import time
@@ -542,10 +557,10 @@ import json
 from collections import OrderedDict
 
 class ModelSaver:
-    def __init__(self,path,accu_list,es_max_window=20,es_mode="no_min_more",
-                        trace_latest_interval = 20,
-                        block_best_interval   = 100,
-                        epoches=None,**kargs):
+    def __init__(self,path,accu_list,
+                        trace_latest_interval = 30,
+                        block_best_interval   = 41,
+                        epoches=None,earlystop_config={},**kargs):
         self.epoches      = epoches
         self.accu_list    = accu_list
         self.path         = path
@@ -554,18 +569,23 @@ class ModelSaver:
         self.best_path    = os.path.join(self.path,'best')
         self.status_file  = os.path.join(self.path,'saver_info.json')
         ## for early stop
-        self.early_stop_window  = es_max_window
-        self.early_stop_mode    = es_mode
+        self.earlystop_config  = earlystop_config
 
-        ## for early stop
-
+        ## for early stop saving
         self.trace_latest_interval = trace_latest_interval
         self.block_best_interval   = block_best_interval
 
         self.model_weight          = {}
         self.loss_stores  = {}
         for accu_type in self.accu_list:
-            self.loss_stores[accu_type]=LossStores()
+            earlystop_log = logging.getLogger(f"earlystop_log_for_{accu_type}")
+            if (earlystop_log.hasHandlers()):earlystop_log.handlers.clear()# Important!!
+            earlystop_log.setLevel(logging.DEBUG)
+            handler = logging.FileHandler(os.path.join(self.path,f'{accu_type}.earlystop.log'))
+            handler.setLevel(logging.DEBUG)
+            handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+            earlystop_log.addHandler(handler)
+            self.loss_stores[accu_type]=LossStores(logger = earlystop_log)
 
         if os.path.exists(self.status_file):
             self._reload()
@@ -729,11 +749,12 @@ class ModelSaver:
                 saveQ      = False
 
             ### check early stop status
-            if eps is None:
-                if "MAE" in accu_type:eps=0.001
-                else:eps=0.00001
+            # if eps is None:
+            #     if "MAE" in accu_type:eps=0.001
+            #     else:eps=0.00001
 
-            earlystopQ        = self.loss_stores[accu_type].earlystop(accu,eps=eps,max_length=self.early_stop_window,mode=self.early_stop_mode)
+            #earlystopQ        = self.loss_stores[accu_type].earlystop(accu,eps=eps,max_length=self.early_stop_window,mode=self.early_stop_mode)
+            earlystopQ        = self.loss_stores[accu_type].earlystop(accu,**self.earlystop_config)
             if earlystopQ:total_estop+=1
             self.loss_stores[accu_type].update(accu,epoch)
 

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-
+import logging
 import copy
 import torch.nn.functional as F
 import os,re
@@ -305,8 +305,8 @@ class LossStores:
     def earlystop(self,num,eps=0.00001,es_max_window=30, anti_over_fit_length=50, max_tail=40,mode="no_min_more"):
         lg = self.logger
         self.buffer = list(self.store.values())
-        if len(self.buffer)<=max_length:return False
-        window = self.buffer[-max_length:]
+        if len(self.buffer)<=es_max_window:return False
+        window = self.buffer[-es_max_window:]
         if mode == "no_min_more":
             if num > max(window)-eps:
                 if lg is not None:lg.info(f'''[earlystop detected]
@@ -577,6 +577,13 @@ class ModelSaver:
 
         self.model_weight          = {}
         self.loss_stores  = {}
+
+
+        if os.path.exists(self.status_file):
+            self._reload()
+        else:
+            self._initial()
+
         for accu_type in self.accu_list:
             earlystop_log = logging.getLogger(f"earlystop_log_for_{accu_type}")
             if (earlystop_log.hasHandlers()):earlystop_log.handlers.clear()# Important!!
@@ -586,11 +593,6 @@ class ModelSaver:
             handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
             earlystop_log.addHandler(handler)
             self.loss_stores[accu_type]=LossStores(logger = earlystop_log)
-
-        if os.path.exists(self.status_file):
-            self._reload()
-        else:
-            self._initial()
     @property
     def saved_epoch_record(self):
         return self.status['saved_epoch_record']

@@ -361,15 +361,21 @@ class LoggingSystem:
         return last_epoch
 
     def archive_saver(self,archive_flag=None,key_flag=None):
-        archive_flag     = time.strftime("%m_%d_%H_%M_%S") if not archive_flag else archive_flag
+        archive_flag        = time.strftime("%m_%d_%H_%M_%S") if not archive_flag else archive_flag
         routine_weight_path,epoch = self.model_saver.get_latest_model(soft_mode=True)
         best_weight_path    = self.model_saver.get_best_model(key_flag=key_flag)
         new_saver_path      = self.saver_path+f".{archive_flag}"
-        routine_weight_path = os.path.join(new_saver_path,routine_weight_path) if routine_weight_path is not None else None
-        best_weight_path    = os.path.join(new_saver_path,best_weight_path) if best_weight_path is not None else None
-        os.rename(self.saver_path,new_saver_path)
+        new_routine_weight_path = os.path.join(new_saver_path,routine_weight_path) if routine_weight_path is not None else None
+        new_best_weight_path    = os.path.join(new_saver_path,best_weight_path) if best_weight_path is not None else None
+        old_saver_path          = self.saver_path
+        old_routine_weight_path = os.path.join(old_saver_path,routine_weight_path) if routine_weight_path is not None else None
+        old_best_weight_path    = os.path.join(old_saver_path,best_weight_path) if best_weight_path is not None else None
+
+        if not os.path.exists(new_saver_path):
+            os.system(f"cp -r {old_saver_path} {new_saver_path}")
+        #os.rename(self.saver_path,new_saver_path)
         self.model_saver._initial()
-        return (routine_weight_path,epoch),best_weight_path
+        return (old_routine_weight_path,epoch),old_best_weight_path
 
     def runtime_log_table(self,table_string):
         if not self.global_do_log:return

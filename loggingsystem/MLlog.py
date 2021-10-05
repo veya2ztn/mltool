@@ -302,7 +302,7 @@ class LossStores:
         sort=sorted(self.store.items(), key=lambda d: d[1])
         return sort[num-1][1]
 
-    def earlystop(self,num,eps=0.00001,es_max_window=30, anti_over_fit_length=50, max_tail=40,mode="no_min_more"):
+    def earlystop(self,num,eps=0.00001,es_max_window=30, anti_over_fit_length=50, max_tail=40,mode="no_min_more",**kargs):
         lg = self.logger
         self.buffer = list(self.store.values())
         if len(self.buffer)<=es_max_window:return False
@@ -579,10 +579,7 @@ class ModelSaver:
         self.loss_stores  = {}
 
 
-        if os.path.exists(self.status_file):
-            self._reload()
-        else:
-            self._initial()
+
 
         for accu_type in self.accu_list:
             earlystop_log = logging.getLogger(f"earlystop_log_for_{accu_type}")
@@ -593,6 +590,10 @@ class ModelSaver:
             handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
             earlystop_log.addHandler(handler)
             self.loss_stores[accu_type]=LossStores(logger = earlystop_log)
+        if os.path.exists(self.status_file):
+            self._reload()
+        else:
+            self._initial()
     @property
     def saved_epoch_record(self):
         return self.status['saved_epoch_record']
@@ -671,9 +672,8 @@ class ModelSaver:
             except:
                 return checkpointer.state_dict()
 
-    def save_latest_model(self,model,epoch,epoches=None):
+    def save_latest_model(self,model,epoch,epoches=None,force_do = False):
         if epoches is None:epoches = self.epoches
-        force_do = False
         if epoch+1== epoches:force_do = True
         if epoch%self.trace_latest_interval==0 or force_do:
             time_at_save = time.strftime("%m_%d_%H_%M")

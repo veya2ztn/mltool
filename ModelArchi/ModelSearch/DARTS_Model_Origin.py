@@ -133,14 +133,14 @@ class Network(nn.Module):
         if C is None: C=genotype.init_channels
         else:assert (not hasattr(genotype,'init_channels')) or C==genotype.init_channels
 
-        if num_classes is None: num_classes=genotype.num_classes
-        else:assert (not hasattr(genotype,'num_classes')) or num_classes==genotype.num_classes
+        if num_classes is None: num_classes=genotype.classes
+        else:assert (not hasattr(genotype,'classes')) or num_classes==genotype.classes
 
         if nodes is None: nodes=genotype.nodes
         else:assert (not hasattr(genotype,'nodes')) or  nodes==genotype.nodes
 
         if layers is None: layers=genotype.layers
-        else:assert (not hasattr(genotype,'layers')) or  layers==genotype.layers 
+        else:assert (not hasattr(genotype,'layers')) or  layers==genotype.layers
 
 
         self._layers = layers

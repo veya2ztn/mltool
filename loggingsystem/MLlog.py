@@ -568,6 +568,8 @@ class ModelSaver:
         self.routine_path = os.path.join(self.path,'routine')
         self.best_path    = os.path.join(self.path,'best')
         self.status_file  = os.path.join(self.path,'saver_info.json')
+        if not os.path.exists(self.routine_path):os.makedirs(self.routine_path)
+        if not os.path.exists(self.best_path):os.makedirs(self.best_path)
         ## for early stop
         self.earlystop_config  = earlystop_config
 

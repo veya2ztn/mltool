@@ -42,21 +42,21 @@ class Cell(nn.Module):
 
         self._steps     = len(op_names)
         self._concat    = concat
-        self.multiplier = len(concat)
+
         self._ops       = nn.ModuleList()
-        self.in_nodes=[]
+        self.in_nodes   = []
         for names, indexes in zip(op_names, indices):
             in_node=[]
             for name,index in zip(names, indexes):
                 stride = 2 if reduction and index < 2 else 1
-                if name == "deleted" or name =="none":continue
+                if name == "deleted" or name == "none":continue
                 if index > len(in_node):continue
                 op = OPS[name](C, stride, True)
                 self._ops += [op]
                 in_node.append(index)
             self.in_nodes.append(in_node)
-        self._indices = indices
-
+        self._indices   = indices
+        self.multiplier = len([index for index in self.in_nodes if len(index)!=0])
     def forward(self, s0, s1, drop_prob):
         s0 = self.preprocess0(s0)
         s1 = self.preprocess1(s1)
@@ -72,9 +72,8 @@ class Cell(nn.Module):
                 if self.training and drop_prob > 0.0 and (not isinstance(op, Identity)):h = drop_path(h, drop_prob)
                 s+=h
                 edge_id+=1
-            states += [s]
-        return torch.cat([states[i] for i in self._concat], dim=1)
-
+            if type(s) != int:states += [s]
+        return torch.cat(states[2:], dim=1)
 
 class AuxiliaryHeadCIFAR(nn.Module):
     def __init__(self, C, num_classes):
@@ -97,7 +96,6 @@ class AuxiliaryHeadCIFAR(nn.Module):
         x = self.features(x)
         x = self.classifier(x.view(x.size(0), -1))
         return x
-
 
 class AuxiliaryHeadImageNet(nn.Module):
     def __init__(self, C, num_classes):
@@ -144,7 +142,7 @@ class Network(nn.Module):
         else:assert (not hasattr(genotype,'layers')) or  layers==genotype.layers
 
 
-        self._layers = layers
+        self._layers    = layers
         self._auxiliary = auxiliary
         self.drop_path_prob = 0 ### NOTE: the origin train code will active use dropout
         stem_multiplier = 3

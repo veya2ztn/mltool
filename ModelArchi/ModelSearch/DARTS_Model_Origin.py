@@ -49,7 +49,8 @@ class Cell(nn.Module):
             in_node=[]
             for name,index in zip(names, indexes):
                 stride = 2 if reduction and index < 2 else 1
-                if name == "deleted":continue
+                if name == "deleted" or name =="none":continue
+                if index > len(in_node):continue
                 op = OPS[name](C, stride, True)
                 self._ops += [op]
                 in_node.append(index)

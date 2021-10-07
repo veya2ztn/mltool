@@ -50,13 +50,13 @@ class Cell(nn.Module):
             for name,index in zip(names, indexes):
                 stride = 2 if reduction and index < 2 else 1
                 if name == "deleted" or name == "none":continue
-                if index > len(in_node):continue
+                if index > len(self.in_nodes)+2:continue
                 op = OPS[name](C, stride, True)
                 self._ops += [op]
                 in_node.append(index)
-            self.in_nodes.append(in_node)
+            if len(in_node)>0:self.in_nodes.append(in_node)
         self._indices   = indices
-        self.multiplier = len([index for index in self.in_nodes if len(index)!=0])
+        self.multiplier = len(self.in_nodes)
     def forward(self, s0, s1, drop_prob):
         s0 = self.preprocess0(s0)
         s1 = self.preprocess1(s1)
@@ -73,7 +73,7 @@ class Cell(nn.Module):
                 s+=h
                 edge_id+=1
             if type(s) != int:states += [s]
-        return torch.cat(states[2:], dim=1)
+        return torch.cat(states[-self.multiplier:], dim=1)
 
 class AuxiliaryHeadCIFAR(nn.Module):
     def __init__(self, C, num_classes):

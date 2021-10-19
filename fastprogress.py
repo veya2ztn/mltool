@@ -253,7 +253,7 @@ class NBMasterBar(MasterBar):
         if 'pb2' in self.inner_dict: self.inner_dict['pb2'] = self.child.progress
         to_show = [name for name in self.order if name in self.inner_dict.keys()]
         self.html_code = '\n'.join([self.inner_dict[n] for n in to_show])
-        self.out.update(HTML(self.html_code))
+        if hasattr(self,"out"):self.out.update(HTML(self.html_code))
 
     def write(self, line, table=False):
         if not table: self.text += line + "<p>"

@@ -264,8 +264,8 @@ class LoggingSystem:
                                 anormal_d_config={},**kargs):
         if not self.global_do_log:return
         self.saver_path  = os.path.join(self.ckpt_root,'saver') if not path else path
-        self.model_saver = ModelSaver(self.saver_path,accu_list,earlystop_config=earlystop_config.config,**kargs)
-        self.anomal_detecter =anomal_detect(**(anormal_d_config['config']))
+        self.model_saver = ModelSaver(self.saver_path,accu_list,earlystop_config=earlystop_config  ,**kargs)
+        self.anomal_detecter =anomal_detect(**anormal_d_config)
 
     def create_recorder(self,**kargs):
         if not self.global_do_log:return

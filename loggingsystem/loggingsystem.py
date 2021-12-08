@@ -8,7 +8,7 @@ import os, random ,torch,shutil
 import numpy as np
 import torch.backends.cudnn as cudnn
 import logging,time
-
+ISNotbookQ=isnotebook()
 class RNGSeed:
     def __init__(self, seed):
         self.seed = seed
@@ -380,7 +380,8 @@ class LoggingSystem:
     def runtime_log_table(self,table_string):
         if not self.global_do_log:return
         if self.bar_log is None:
-            self.master_bar.write_table(table_string,2,4)
+            if not ISNotbookQ:
+                self.master_bar.write_table(table_string,2,4)
         else:
             magic_char = "\033[F"
             self.bar_log.info(magic_char * (len(table_string)+2))

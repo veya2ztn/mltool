@@ -9,11 +9,11 @@ def read_json(path):
 #163邮箱服务器地址
 mail_host = 'smtp.163.com'
 #163用户名
-mail_user = 'zhangtianning110'
+mail_user = 'ztn110'
 #密码(部分邮箱为授权码)
 mail_pass = 'CEACVHUFOEYPBYUJ'
 #邮件发送方邮箱地址
-sender = 'zhangtianning110@163.com'
+sender = 'ztn110@163.com'
 #邮件接受方邮箱地址，注意需要[]包裹，这意味着你可以写多个邮件地址群发
 receivers = ['645506775@qq.com']
 

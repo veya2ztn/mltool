@@ -15,15 +15,15 @@ def drop_path(x, drop_prob):
     return x
 
 class Cell(nn.Module):
-    def __init__(self, genotype, C_prev_prev, C_prev, C, reduction, reduction_prev):
+    def __init__(self, genotype, C_prev_prev, C_prev, C, reduction, reduction_prev,padding_mode='zeros'):
         super(Cell, self).__init__()
         #print(C_prev_prev, C_prev, C)
 
         if reduction_prev:
             self.preprocess0 = FactorizedReduce(C_prev_prev, C)
         else:
-            self.preprocess0 = ReLUConvBN(C_prev_prev, C, 1, 1, 0)
-        self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0)
+            self.preprocess0 = ReLUConvBN(C_prev_prev, C, 1, 1, 0,padding_mode=padding_mode)
+        self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0,padding_mode=padding_mode)
 
         if reduction:
             op_names, indices = zip(*genotype.reduce)
@@ -31,9 +31,9 @@ class Cell(nn.Module):
         else:
             op_names, indices = zip(*genotype.normal)
             concat = genotype.normal_concat
-        self._compile(C, op_names, indices, concat, reduction)
+        self._compile(C, op_names, indices, concat, reduction,padding_mode=padding_mode)
 
-    def _compile(self, C, op_names, indices, concat, reduction):
+    def _compile(self, C, op_names, indices, concat, reduction,padding_mode='zeros'):
         assert len(op_names) == len(indices)
         def restructure(_list):
             return [[_list[2*i],_list[2*i+1]] for i in range(len(_list)//2)]
@@ -51,7 +51,7 @@ class Cell(nn.Module):
                 stride = 2 if reduction and index < 2 else 1
                 if name == "deleted" or name == "none":continue
                 if index > len(self.in_nodes)+2:continue
-                op = OPS[name](C, stride, True)
+                op = OPS[name](C, stride, True,padding_mode=padding_mode)
                 self._ops += [op]
                 in_node.append(index)
             if len(in_node)>0:self.in_nodes.append(in_node)
@@ -122,7 +122,7 @@ class AuxiliaryHeadImageNet(nn.Module):
 
 #Genotype = namedtuple("Genotype", "normal normal_concat reduce reduce_concat init_channels num_classes layers nodes")
 class Network(nn.Module):
-    def __init__(self, C=None, num_classes=None, nodes=None,layers=None, auxiliary=False, genotype=None,**kargs):
+    def __init__(self, C=None, num_classes=None, nodes=None,layers=None, auxiliary=False, genotype=None,padding_mode='zeros',**kargs):
         super(Network, self).__init__()
         assert genotype is not None
         if isinstance(genotype,str):
@@ -150,7 +150,7 @@ class Network(nn.Module):
         stem_multiplier = 3
         C_curr = stem_multiplier * C
         self.stem = nn.Sequential(
-            nn.Conv2d(1, C_curr, 3, padding=1, bias=False), nn.BatchNorm2d(C_curr)
+            nn.Conv2d(1, C_curr, 3, padding=1, bias=False,padding_mode=padding_mode), nn.BatchNorm2d(C_curr)
         )
 
         C_prev_prev, C_prev, C_curr = C_curr, C_curr, C
@@ -163,7 +163,7 @@ class Network(nn.Module):
             else:
                 reduction = False
             cell = Cell(
-                genotype, C_prev_prev, C_prev, C_curr, reduction, reduction_prev
+                genotype, C_prev_prev, C_prev, C_curr, reduction, reduction_prev,padding_mode=padding_mode
             )
             reduction_prev = reduction
             self.cells += [cell]

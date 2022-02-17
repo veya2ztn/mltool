@@ -122,7 +122,10 @@ class AuxiliaryHeadImageNet(nn.Module):
 
 #Genotype = namedtuple("Genotype", "normal normal_concat reduce reduce_concat init_channels num_classes layers nodes")
 class Network(nn.Module):
-    def __init__(self, C=None, num_classes=None, nodes=None,layers=None, auxiliary=False, genotype=None,padding_mode='zeros',**kargs):
+    def __init__(self, C=None, num_classes=None,
+                        nodes=None,layers=None, auxiliary=False, genotype=None,
+                        padding_mode='zeros',virtual_bond_dim=5,
+                        tnend=False,**kargs):
         super(Network, self).__init__()
         assert genotype is not None
         if isinstance(genotype,str):
@@ -173,7 +176,19 @@ class Network(nn.Module):
 
         if auxiliary:
             self.auxiliary_head = AuxiliaryHeadCIFAR(C_to_auxiliary, num_classes)
-        self.global_pooling = nn.AdaptiveAvgPool2d(1)
+        if tnend:
+            from .tnmodel.extend_model import Patch2NetworkInput
+            from .tnmodel.two_dim_model import PEPS_uniform_shape_symmetry_any
+            self.global_pooling = nn.Sequential(
+                                      Patch2NetworkInput(1),
+                                      PEPS_uniform_shape_symmetry_any(W=4,H=4,
+                                      in_physics_bond=256,
+                                      init_std=1e-5,
+                                      out_features=256,
+                                      virtual_bond_dim=virtual_bond_dim,symmetry='P4Z2'),
+                                  )
+        else:
+            self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(C_prev, num_classes)
 
     def get_save_states(self):

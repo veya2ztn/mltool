@@ -180,12 +180,15 @@ class Network(nn.Module):
             from .tnmodel.extend_model import Patch2NetworkInput
             from .tnmodel.two_dim_model import PEPS_uniform_shape_symmetry_any
             self.global_pooling = nn.Sequential(
+
+                                      nn.Tanh(),
+                                      #nn.BatchNorm2d(256),
                                       Patch2NetworkInput(1),
                                       PEPS_uniform_shape_symmetry_any(W=4,H=4,
-                                      in_physics_bond=256,
-                                      init_std=1e-5,
-                                      out_features=256,
-                                      virtual_bond_dim=virtual_bond_dim,symmetry='P4Z2'),
+                                          in_physics_bond=256,
+                                          init_std=1e-5,
+                                          out_features=256,init_method="Expecatation_Normalization",init_set_var=0.01,
+                                          virtual_bond_dim=virtual_bond_dim,symmetry='P4Z2'),
                                   )
         else:
             self.global_pooling = nn.AdaptiveAvgPool2d(1)

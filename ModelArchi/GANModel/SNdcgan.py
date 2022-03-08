@@ -43,7 +43,7 @@ class Generator(torch.nn.Module):
         return self.output(x)
 
 class Discriminator(torch.nn.Module):
-    def __init__(self, channels,version="BCEwithlogit"):
+    def __init__(self, channels,version="DCGAN_M"):
         super().__init__()
         self.version = version
         self.main_module = nn.Sequential(

@@ -560,11 +560,11 @@ class ModelSaver:
     def __init__(self,path,accu_list,
                         trace_latest_interval = 30,
                         block_best_interval   = 41,
-                        epoches=None,earlystop_config={},**kargs):
+                        epoches=None,earlystop_config={},verbose=1,**kargs):
         self.epoches      = epoches
         self.accu_list    = accu_list
         self.path         = path
-
+        self.verbose      = verbose
         self.routine_path = os.path.join(self.path,'routine')
         self.best_path    = os.path.join(self.path,'best')
         self.status_file  = os.path.join(self.path,'saver_info.json')
@@ -610,7 +610,7 @@ class ModelSaver:
         self._save_status(self.status)
 
     def _reload(self):
-        print("ModelSaverInfo:we will now reload the accu-tracking")
+        if self.verbose:print("ModelSaverInfo:we will now reload the accu-tracking")
         status_now = self._get_status()
         self.status= status_now
         if 'saved_epoch_record' not in self.status:
@@ -632,11 +632,11 @@ class ModelSaver:
                 accu = pool[accu_type]
                 self.loss_stores[accu_type].update(accu,epoch)
         ### show a snap
-        print("ModelSaverInfo:below is a snap for the previous training tracking")
+        if self.verbose:print("ModelSaverInfo:below is a snap for the previous training tracking")
         for accu_type in self.accu_list:
             keys = list(self.loss_stores[accu_type].store.keys())[-20:]
             values=",".join(["{:.4f}".format(self.loss_stores[accu_type].store[key]) for key in keys])
-            print(f"{accu_type}:{values}")
+            if self.verbose:print(f"{accu_type}:{values}")
 
     def _get_status(self):
         # the _status record in a json file named "saver_info.json"
@@ -692,15 +692,15 @@ class ModelSaver:
     def get_latest_model(self,soft_mode=False):
         existedweight= os.listdir(self.routine_path)
         if len(existedweight)==0:
-            print("====> ModelSaverInfo:no latest weight find <====")
+            if self.verbose:print("====> ModelSaverInfo:no latest weight find <====")
             if soft_mode:return None,0
             raise
         existedweight=existedweight[0]
-        print(f"====> ModelSaverInfo:find latest weight: {existedweight}  <====")
+        if self.verbose:print(f"====> ModelSaverInfo:find latest weight: {existedweight}  <====")
         weight_path = os.path.join('routine',existedweight)
         start_epoch = re.findall(r"epoch-(.*)", existedweight)
         if len(start_epoch)==0:
-            print("====> ModelSaverInfo:can not parse the start_epoch <====")
+            if self.verbose:print("====> ModelSaverInfo:can not parse the start_epoch <====")
             raise
         start_epoch = int(start_epoch[0])
         return os.path.join(self.routine_path,existedweight),start_epoch
@@ -708,10 +708,10 @@ class ModelSaver:
     def get_best_model(self,key_flag=None):
         existedweight= os.listdir(self.best_path)
         if len(existedweight)==0:
-            print('ModelSaverInfo:no best saver')
+            if self.verbose:print('ModelSaverInfo:no best saver')
             return None
         if len(existedweight)>1:
-            print("====> ModelSaverInfo:multi best weight find<====")
+            if self.verbose:print("====> ModelSaverInfo:multi best weight find<====")
             print(existedweight)
             assert not key_flag
         if not key_flag:

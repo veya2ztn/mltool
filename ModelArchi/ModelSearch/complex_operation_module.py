@@ -22,7 +22,7 @@ class TakeNorm(nn.Module):
         x=abs(x)
         return x
 class CplxReLUConvBN(nn.Module):
-    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True,**kargs):
         super().__init__()
         self.op = nn.Sequential(
             Real2Complex_V0(C_in),
@@ -35,7 +35,7 @@ class CplxReLUConvBN(nn.Module):
         return self.op(x)
 class CplxDilConv(nn.Module):
     def __init__(
-        self, C_in, C_out, kernel_size, stride, padding, dilation, affine=True
+        self, C_in, C_out, kernel_size, stride, padding, dilation, affine=True,**kargs
     ):
         super().__init__()
         self.op = nn.Sequential(
@@ -58,7 +58,7 @@ class CplxDilConv(nn.Module):
     def forward(self, x):
         return self.op(x)
 class CplxSepConv(nn.Module):
-    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True,**kargs):
         super().__init__()
         self.op = nn.Sequential(
             Real2Complex_V0(C_in),

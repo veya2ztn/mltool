@@ -50,7 +50,7 @@ class Cell(nn.Module):
             for name,index in zip(names, indexes):
                 stride = 2 if reduction and index < 2 else 1
                 if name == "deleted" or name == "none":continue
-                if index > len(self.in_nodes)+2:continue
+                if index >= len(self.in_nodes)+2:continue # check previous node is generated.
                 op = OPS[name](C, stride, True,padding_mode=padding_mode)
                 self._ops += [op]
                 in_node.append(index)

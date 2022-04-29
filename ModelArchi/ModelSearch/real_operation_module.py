@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.batchnorm import _BatchNorm
 
+from ..SymmetryCNN import symmetry_config_fix
 class ReLUcclConvBN(nn.Module):
     def __init__(self, C_in, C_out, k, s, d, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU,circularQ=True,affine=True):
         super(ReLUcclConvBN, self).__init__()
@@ -72,8 +73,11 @@ class AdaptiveBatchNorm2d(_BatchNorm):
             self.running_var if not self.training or self.track_running_stats else None,
             self.weight, self.bias, bn_training, exponential_average_factor, self.eps)
 class ReLUConvBN(nn.Module):
-  def __init__(self, C_in, C_out, kernel_size, stride, padding, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True,padding_mode='zeros'):
+  def __init__(self, C_in, C_out, kernel_size, stride, padding, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True,padding_mode='zeros',active_symmetry_fix=False):
     super(ReLUConvBN, self).__init__()
+    self.active_symmetry_fix = active_symmetry_fix
+    if self.active_symmetry_fix:
+        kernel_size,stride,padding,dilation = symmetry_config_fix(kernel_size,stride,padding,1)
     self.op = nn.Sequential(
       Nonlinear(inplace=False),
       CNNModule(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False,padding_mode=padding_mode),
@@ -82,22 +86,32 @@ class ReLUConvBN(nn.Module):
   def forward(self, x):
     return self.op(x)
 class DilConv(nn.Module):
-  def __init__(self, C_in, C_out, kernel_size, stride, padding, dilation=2, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True,padding_mode='zeros'):
+  def __init__(self, C_in, C_out, kernel_size, stride, padding, dilation=2, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True,padding_mode='zeros',active_symmetry_fix=False):
     super(DilConv, self).__init__()
+    self.active_symmetry_fix = active_symmetry_fix
+    kernel_size_d = kernel_size
+    padding_d     = padding
+    if self.active_symmetry_fix:
+        kernel_size_d,stride,padding_d,dilation = symmetry_config_fix(kernel_size,stride,padding,dilation)
     self.op = nn.Sequential(
       Nonlinear(inplace=False),
-      CNNModule(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=C_in, bias=False,padding_mode=padding_mode),
+      CNNModule(C_in, C_in, kernel_size=kernel_size_d, stride=stride, padding=padding_d, dilation=dilation, groups=C_in, bias=False,padding_mode=padding_mode),
       CNNModule(C_in, C_out, kernel_size=1, padding=0, bias=False,padding_mode=padding_mode),
       AdaptiveBatchNorm2d(C_out, affine=affine),
       )
   def forward(self, x):
     return self.op(x)
 class SepConv(nn.Module):
-  def __init__(self, C_in, C_out, kernel_size, stride, padding, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True,padding_mode='zeros'):
+  def __init__(self, C_in, C_out, kernel_size, stride, padding, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True,padding_mode='zeros',active_symmetry_fix=False):
     super(SepConv, self).__init__()
+    self.active_symmetry_fix = active_symmetry_fix
+    kernel_size_d = kernel_size
+    padding_d     = padding
+    if self.active_symmetry_fix:
+        kernel_size_d,stride,padding_d,dilation = symmetry_config_fix(kernel_size,stride,padding,1)
     self.op = nn.Sequential(
       Nonlinear(inplace=False),
-      CNNModule(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding, groups=C_in, bias=False,padding_mode=padding_mode),
+      CNNModule(C_in, C_in, kernel_size=kernel_size_d, stride=stride, padding=padding_d, groups=C_in, bias=False,padding_mode=padding_mode),
       CNNModule(C_in, C_in, kernel_size=1, padding=0, bias=False,padding_mode=padding_mode),
       AdaptiveBatchNorm2d(C_in, affine=affine),
       Nonlinear(inplace=False),
@@ -121,12 +135,20 @@ class Zero(nn.Module):
       return x.mul(0.)
     return x[:,:,::self.stride,::self.stride].mul(0.)
 class FactorizedReduce(nn.Module):
-  def __init__(self, C_in, C_out, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True,padding_mode='zeros'):
+  def __init__(self, C_in, C_out, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True,padding_mode='zeros',active_symmetry_fix=False):
     super(FactorizedReduce, self).__init__()
     assert C_out % 2 == 0
-    self.relu = Nonlinear(inplace=False)
-    self.conv_1 = CNNModule(C_in, C_out // 2, 1, stride=2, padding=0, bias=False,padding_mode=padding_mode)
-    self.conv_2 = CNNModule(C_in, C_out // 2, 1, stride=2, padding=0, bias=False,padding_mode=padding_mode)
+    self.active_symmetry_fix = active_symmetry_fix
+    kernel_size = 1
+    padding     = 0
+    stride      = 2
+    kernel_size_d = kernel_size
+    padding_d     = padding
+    if self.active_symmetry_fix:
+        kernel_size_d,stride,padding_d,dilation = symmetry_config_fix(kernel_size,stride,padding,1)
+    self.relu   = Nonlinear(inplace=False)
+    self.conv_1 = CNNModule(C_in, C_out // 2, kernel_size_d, stride=stride, padding=padding_d, bias=False,padding_mode=padding_mode)
+    self.conv_2 = CNNModule(C_in, C_out // 2, kernel_size_d, stride=stride, padding=padding_d, bias=False,padding_mode=padding_mode)
     self.bn = AdaptiveBatchNorm2d(C_out, affine=affine)
   def forward(self, x):
     x = self.relu(x)

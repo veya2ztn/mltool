@@ -62,6 +62,24 @@ OPS = {
     "[symP4Z2]dil_conv_3x3": lambda C, stride, affine,padding_mode='zeros': DilConv(C, C, 3, stride, 2, CNNModule=P4Z2_Conv2d, affine=affine,padding_mode=padding_mode),
     "[symP4Z2]dil_conv_5x5": lambda C, stride, affine,padding_mode='zeros': DilConv(C, C, 5, stride, 4, CNNModule=P4Z2_Conv2d, affine=affine,padding_mode=padding_mode),
 
+
+    "[auto][symP4]sep_conv_3x3": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 3, stride, 1, CNNModule=P4_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symP4]sep_conv_5x5": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 5, stride, 2, CNNModule=P4_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symP4]sep_conv_7x7": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 7, stride, 3, CNNModule=P4_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symP4]dil_conv_3x3": lambda C, stride, affine,padding_mode='zeros': DilConv(C, C, 3, stride, 2, CNNModule=P4_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symP4]dil_conv_5x5": lambda C, stride, affine,padding_mode='zeros': DilConv(C, C, 5, stride, 4, CNNModule=P4_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symZ2]sep_conv_3x3": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 3, stride, 1, CNNModule=Z2_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symZ2]sep_conv_5x5": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 5, stride, 2, CNNModule=Z2_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symZ2]sep_conv_7x7": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 7, stride, 3, CNNModule=Z2_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symZ2]dil_conv_3x3": lambda C, stride, affine,padding_mode='zeros': DilConv(C, C, 3, stride, 2, CNNModule=Z2_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symZ2]dil_conv_5x5": lambda C, stride, affine,padding_mode='zeros': DilConv(C, C, 5, stride, 4, CNNModule=Z2_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symP4Z2]sep_conv_3x3": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 3, stride, 1, CNNModule=P4Z2_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symP4Z2]sep_conv_5x5": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 5, stride, 2, CNNModule=P4Z2_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symP4Z2]sep_conv_7x7": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 7, stride, 3, CNNModule=P4Z2_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symP4Z2]dil_conv_3x3": lambda C, stride, affine,padding_mode='zeros': DilConv(C, C, 3, stride, 2, CNNModule=P4Z2_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+    "[auto][symP4Z2]dil_conv_5x5": lambda C, stride, affine,padding_mode='zeros': DilConv(C, C, 5, stride, 4, CNNModule=P4Z2_Conv2d, affine=affine,padding_mode=padding_mode,active_symmetry_fix=True),
+
+
     "[eMPSCNN]sep_conv_3x3": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 3, stride, 1, CNNModule=embedConv2d, affine=affine,padding_mode=padding_mode),
     "[eMPSCNN]sep_conv_5x5": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 5, stride, 2, CNNModule=embedConv2d, affine=affine,padding_mode=padding_mode),
     "[eMPSCNN]sep_conv_7x7": lambda C, stride, affine,padding_mode='zeros': SepConv(C, C, 7, stride, 3, CNNModule=embedConv2d, affine=affine,padding_mode=padding_mode),

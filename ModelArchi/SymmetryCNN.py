@@ -93,18 +93,59 @@ class H2_Conv2d(Symmetry_Conv2d):
     group_num = 2
     Group     = GroupH2
 
+def symmetry_config_fix(kernel_size,stride,padding,dilation):
+    # when stride = 2, the k=3,s=2,p=1 CNN layer for even size input like (16,16) would destroy symmetry passing.
+    # we will force this case to right way, like (k,s,p) = (3,2,1) --> (2,2,0)
+    if not isinstance(kernel_size,int):
+        assert  kernel_size[0] == kernel_size[1]
+        kernel_size = kernel_size[0]
+    if not isinstance(stride,int):
+        assert  stride[0] == stride[1]
+        stride = stride[0]
+    if not isinstance(padding,int):
+        assert  padding[0] == padding[1]
+        padding = padding[0]
+    if not isinstance(dilation,int):
+        assert  dilation[0] == dilation[1]
+        dilation = dilation[0]
+    if dilation>1:
+        return symmetry_config_fix(kernel_size,stride,padding,1)
+    if  (kernel_size-1)*dilation != 2*padding + stride -1:
+        if padding %2 !=0:
+            padding+=1
+            return symmetry_config_fix(kernel_size,stride,padding,dilation)
+        kernel_size = (2*padding + stride -1)//dilation + 1
+    return kernel_size,stride,padding,dilation
+    # raise NotImplementedError(f'''please check your CNN config kernel, stride and padding:
+    #     kernel_size ={kernel_size },
+    #     stride      ={stride      },
+    #     padding     ={padding     },
+    #     dilation    ={dilation    }
+    #     ''')
+
 SymmetryCNNPool={"P4":P4_Conv2d,'P4Z2':P4Z2_Conv2d,'V2':V2_Conv2d,'H2':H2_Conv2d,'Z2':Z2_Conv2d}
-def cnn2symmetrycnn(module,type='P4Z2'):
+def cnn2symmetrycnn(module,type='P4Z2',active_symmetry_fix=False):
     module_output = module
+
     if isinstance(module, Conv2d):
-        module_output = SymmetryCNNPool[type](in_channels =module.in_channels ,
-                                        out_channels=module.out_channels,
-                                        kernel_size =module.kernel_size ,
-                                        stride      =module.stride      ,
-                                        padding     =module.padding     ,
-                                        dilation    =module.dilation    ,
-                                        bias        =False if module.bias is None else True)
+        in_channels =module.in_channels
+        out_channels=module.out_channels
+        kernel_size =module.kernel_size
+        stride      =module.stride
+        padding     =module.padding
+        dilation    =module.dilation
+        bias        =False if module.bias is None else True
+        if active_symmetry_fix:
+            assert active_symmetry_fix == 'even' # not only for even input
+            kernel_size,stride,padding,dilation = symmetry_config_fix(kernel_size,stride,padding,dilation)
+        module_output = SymmetryCNNPool[type](in_channels =in_channels ,
+                                             out_channels=out_channels,
+                                             kernel_size =kernel_size ,
+                                             stride      =stride      ,
+                                             padding     =padding     ,
+                                             dilation    =dilation    ,
+                                             bias        =bias        )
     for name, child in module.named_children():
-        module_output.add_module(name, cnn2symmetrycnn(child,type))
+        module_output.add_module(name, cnn2symmetrycnn(child,type,active_symmetry_fix=active_symmetry_fix))
     del module
     return module_output

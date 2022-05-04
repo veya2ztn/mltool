@@ -135,23 +135,24 @@ class Zero(nn.Module):
       return x.mul(0.)
     return x[:,:,::self.stride,::self.stride].mul(0.)
 class FactorizedReduce(nn.Module):
-  def __init__(self, C_in, C_out, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True,padding_mode='zeros',active_symmetry_fix=False):
-    super(FactorizedReduce, self).__init__()
-    assert C_out % 2 == 0
-    self.active_symmetry_fix = active_symmetry_fix
-    kernel_size = 1
-    padding     = 0
-    stride      = 2
-    kernel_size_d = kernel_size
-    padding_d     = padding
-    if self.active_symmetry_fix:
-        kernel_size_d,stride,padding_d,dilation = symmetry_config_fix(kernel_size,stride,padding,1)
-    self.relu   = Nonlinear(inplace=False)
-    self.conv_1 = CNNModule(C_in, C_out // 2, kernel_size_d, stride=stride, padding=padding_d, bias=False,padding_mode=padding_mode)
-    self.conv_2 = CNNModule(C_in, C_out // 2, kernel_size_d, stride=stride, padding=padding_d, bias=False,padding_mode=padding_mode)
-    self.bn = AdaptiveBatchNorm2d(C_out, affine=affine)
-  def forward(self, x):
-    x = self.relu(x)
-    out = torch.cat([self.conv_1(x), self.conv_2(x[:,:,1:,1:])], dim=1)
-    out = self.bn(out)
-    return out
+    #FactorizedReduce cannot implement to Symmetry mode
+    def __init__(self, C_in, C_out, CNNModule=nn.Conv2d,Nonlinear=nn.ReLU, affine=True,padding_mode='zeros',active_symmetry_fix=False):
+        super(FactorizedReduce, self).__init__()
+        assert C_out % 2 == 0
+        self.active_symmetry_fix = active_symmetry_fix
+        kernel_size = 1
+        padding     = 0
+        stride      = 2
+        kernel_size_d = kernel_size
+        padding_d     = padding
+        if self.active_symmetry_fix:
+            kernel_size_d,stride,padding_d,dilation = symmetry_config_fix(kernel_size,stride,padding,1)
+        self.relu   = Nonlinear(inplace=False)
+        self.conv_1 = CNNModule(C_in, C_out // 2, kernel_size_d, stride=stride, padding=padding_d, bias=False,padding_mode=padding_mode)
+        self.conv_2 = CNNModule(C_in, C_out // 2, kernel_size_d, stride=stride, padding=padding_d, bias=False,padding_mode=padding_mode)
+        self.bn = AdaptiveBatchNorm2d(C_out, affine=affine)
+    def forward(self, x):
+        x = self.relu(x)
+        out = torch.cat([self.conv_1(x), self.conv_2(x[:,:,1:,1:])], dim=1)
+        out = self.bn(out)
+        return out

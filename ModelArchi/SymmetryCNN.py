@@ -115,6 +115,8 @@ def symmetry_config_fix(kernel_size,stride,padding,dilation):
             padding+=1
             return symmetry_config_fix(kernel_size,stride,padding,dilation)
         kernel_size = (2*padding + stride -1)//dilation + 1
+    if kernel_size==1 and stride==2 and padding == 0:
+        kernel_size =2
     return kernel_size,stride,padding,dilation
     # raise NotImplementedError(f'''please check your CNN config kernel, stride and padding:
     #     kernel_size ={kernel_size },

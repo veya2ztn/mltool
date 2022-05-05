@@ -3,7 +3,11 @@ import torch.nn as nn
 from .operations_define import *
 from torch.autograd import Variable
 
-
+CNNModulelist={
+"Z2": Z2_Conv2d,
+"P4Z2":P4Z2_Conv2d,
+"P4": P4_Conv2d,
+}
 def drop_path(x, drop_prob):
     if drop_prob > 0.0:
         keep_prob = 1.0 - drop_prob
@@ -14,16 +18,20 @@ def drop_path(x, drop_prob):
         x=x.mul(mask)
     return x
 
+
 class Cell(nn.Module):
-    def __init__(self, genotype, C_prev_prev, C_prev, C, reduction, reduction_prev,padding_mode='zeros'):
+    def __init__(self, genotype, C_prev_prev, C_prev, C, reduction, reduction_prev,padding_mode='zeros',abs_symmetry=False):
         super(Cell, self).__init__()
         #print(C_prev_prev, C_prev, C)
 
-        if reduction_prev:
-            self.preprocess0 = FactorizedReduce(C_prev_prev, C)
+        if not abs_symmetry:
+            self.preprocess0 = FactorizedReduce(C_prev_prev, C, affine=False) if reduction_prev else ReLUConvBN(C_prev_prev, C, 1, 1, 0, affine=False)
+            self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0, affine=False)
         else:
-            self.preprocess0 = ReLUConvBN(C_prev_prev, C, 1, 1, 0,padding_mode=padding_mode)
-        self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0,padding_mode=padding_mode)
+            stride = 2 if reduction_prev else 1
+            CNNModule = CNNModulelist[abs_symmetry]
+            self.preprocess0 = ReLUConvBN(C_prev_prev, C, 1, stride, 0, CNNModule=CNNModule, affine=False,active_symmetry_fix=True)
+            self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0, affine=False)
 
         if reduction:
             op_names, indices = zip(*genotype.reduce)
@@ -120,12 +128,13 @@ class AuxiliaryHeadImageNet(nn.Module):
         x = self.classifier(x.view(x.size(0), -1))
         return x
 
+import re
 #Genotype = namedtuple("Genotype", "normal normal_concat reduce reduce_concat init_channels num_classes layers nodes")
 class Network(nn.Module):
     def __init__(self, C=None, num_classes=None,
                         nodes=None,layers=None, auxiliary=False, genotype=None,
                         padding_mode='zeros',virtual_bond_dim=5,
-                        tnend=False,**kargs):
+                        tnend=False,abs_symmetry=False,**kargs):
         super(Network, self).__init__()
         assert genotype is not None
         if isinstance(genotype,str):
@@ -152,10 +161,30 @@ class Network(nn.Module):
         self.drop_path_prob = 0 ### NOTE: the origin train code will active use dropout
         stem_multiplier = 3
         C_curr = stem_multiplier * C
-        self.stem = nn.Sequential(
-            nn.Conv2d(1, C_curr, 3, padding=1, bias=False,padding_mode=padding_mode), nn.BatchNorm2d(C_curr)
-        )
 
+        normal_op_list, _ = zip(*genotype.normal)
+        reduce_op_list, _ = zip(*genotype.reduce)
+
+        op_names = list(normal_op_list) + list(reduce_op_list)
+        symmetry_mode = False
+        for op_name in op_names:
+            if "[symmetry_keep]" in op_name: symmetry_mode = True
+            if "[auto][sym" in op_name:
+                abs_symmetry = re.findall(r"\[auto\]\[sym(.*)\]",op_name)[0]
+        if not symmetry_mode and abs_symmetry:
+            raise NotImplementedError("Please check your ops, we use auto symmetry mode but may not active symmetry pass in preprocess branch")
+        print(f"activate auto symmetry:{abs_symmetry}")
+        if not abs_symmetry:
+            self.stem = nn.Sequential(
+                nn.Conv2d(1, C_curr, 3, padding=1, bias=False),
+                nn.BatchNorm2d(C_curr)
+            )
+        else:
+            CNNModule = CNNModulelist[abs_symmetry]
+            self.stem = nn.Sequential(
+                CNNModule(1, C_curr, 3, padding=1, bias=False),
+                nn.BatchNorm2d(C_curr)
+            )
         C_prev_prev, C_prev, C_curr = C_curr, C_curr, C
         self.cells = nn.ModuleList()
         reduction_prev = False
@@ -166,7 +195,7 @@ class Network(nn.Module):
             else:
                 reduction = False
             cell = Cell(
-                genotype, C_prev_prev, C_prev, C_curr, reduction, reduction_prev,padding_mode=padding_mode
+                genotype, C_prev_prev, C_prev, C_curr, reduction, reduction_prev,padding_mode=padding_mode,abs_symmetry=abs_symmetry
             )
             reduction_prev = reduction
             self.cells += [cell]

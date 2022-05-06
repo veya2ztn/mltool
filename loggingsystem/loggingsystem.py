@@ -18,10 +18,7 @@ class RNGSeed:
         seed = self.seed
         random.seed(seed)
         np.random.seed(seed)
-        cudnn.benchmark = False
         torch.manual_seed(seed)
-        cudnn.enabled = True
-        cudnn.deterministic = True
         torch.cuda.manual_seed(seed)
 
     def state_dict(self):

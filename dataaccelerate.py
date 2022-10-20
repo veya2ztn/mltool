@@ -39,8 +39,10 @@ class DataSimfetcher():
         return self.batch
 class DataPrefetcher():
     def __init__(self, loader, device='auto'):
-        if device == 'auto':self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        else:raise NotImplementedError
+        if device == 'auto':
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = device#raise NotImplementedError
         self.loader = iter(loader)
         self.stream = torch.cuda.Stream()
         # With Amp, it isn't necessary to manually convert data to half.

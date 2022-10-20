@@ -175,11 +175,14 @@ class LoggingSystem:
         self.recorder     = self.valid_recorder
 
     def info(self,string,show=True):
-
+        if not self.global_do_log:return
         if self.file_logger is None:
 
             info_dir,info_file = os.path.split(self.info_log_path)
-            if info_dir and not os.path.exists(info_dir):os.makedirs(info_dir)
+            try:
+                if info_dir and not os.path.exists(info_dir):os.makedirs(info_dir)
+            except:
+                pass
 
             file_log = logging.getLogger("information_file_log")
 

@@ -144,7 +144,7 @@ class LoggingSystem:
     accu_list = metric_dict = show_best_accu_types=rdn_seed = banner=None
     progress_bar =master_bar=train_bar=valid_bar   = None
     recorder = train_recorder = valid_recorder     = None
-    global_step = console = bar_log =file_logger= tqdm_out  =None
+    global_step = console = bar_log =file_logger= tqdm_out =runtime_log =None
 
     def __init__(self,global_do_log,ckpt_root,info_log_path=None,bar_log_path=None,gpu=0,project_name="project",seed=None,verbose=True):
         self.global_do_log   = global_do_log
@@ -160,6 +160,8 @@ class LoggingSystem:
         if verbose:print(f"log at {ckpt_root}")
         self.info_log_path = os.path.join(self.ckpt_root, 'log.info') if info_log_path is None else info_log_path
         self.bar_log_path  = os.path.join(self.ckpt_root, 'bar.logging.info') if bar_log_path is None else bar_log_path
+        self.runtime_log_path= os.path.join(self.ckpt_root, 'runtime.log') if bar_log_path is None else bar_log_path
+
 
     def set_rdn_seed(self,seed):
         self.rdn_seed = RNGSeed(seed)
@@ -174,38 +176,39 @@ class LoggingSystem:
         self.progress_bar = self.valid_bar
         self.recorder     = self.valid_recorder
 
-    def info(self,string,show=True):
-        if not self.global_do_log:return
-        if self.file_logger is None:
-
-            info_dir,info_file = os.path.split(self.info_log_path)
-            try:
+    @staticmethod
+    def create_logger(name,console=False,offline_path=None,console_level=logging.DEBUG,logformat='%(asctime)s %(message)s'):
+        logger = logging.getLogger(name)
+        if (logger.hasHandlers()):logger.handlers.clear()# Important!!
+        logger.setLevel(logging.DEBUG)
+        
+        if offline_path:
+            info_dir,info_file = os.path.split(offline_path)
+            try:# in multi process will conflict
                 if info_dir and not os.path.exists(info_dir):os.makedirs(info_dir)
             except:
                 pass
+            handler = logging.FileHandler(offline_path)
+            handler.setLevel(level = logging.DEBUG)
+            handler.setFormatter(logging.Formatter(logformat))
+            logger.addHandler(handler)
 
-            file_log = logging.getLogger("information_file_log")
+        if console:
+            console = logging.StreamHandler();
+            console.setLevel(console_level)
+            console.setFormatter(logging.Formatter(logformat))
+            logger.addHandler(console)
+        return logger
 
-            if (file_log.hasHandlers()):file_log.handlers.clear()# Important!!
 
-            file_log.setLevel(logging.DEBUG)
-            handler = logging.FileHandler(self.info_log_path)
-            handler.setLevel(logging.DEBUG)
-            handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
-            file_log.addHandler(handler)
-
-            console_handle = logging.StreamHandler();
-            console_handle.setLevel(logging.WARNING)
-            console_handle.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
-            file_log.addHandler(console_handle)
-
-            self.file_log = file_log
-
+    def info(self,string,show=True):
+        if not self.global_do_log:return
+        if self.file_logger is None:
+            self.file_log = self.create_logger("information_file_log",console=True,offline_path=self.info_log_path,console_level=logging.WARNING)
         if show:
             self.file_log.warn(string)
         else:
             self.file_log.info(string)
-
 
     def record(self,name,value,epoch):
         if not self.global_do_log:return
@@ -220,44 +223,33 @@ class LoggingSystem:
         if self.Q_recorder_type == 'tensorboard':
             self.recorder.add_figure(name,figure,epoch)
 
-    def create_master_bar(self,batches,banner_info=None):
+    def create_master_bar(self,batches,banner_info=None,offline_bar=False):
         if self.bar_log is None and (not isnotebook()):
-            self.info(f"the bar log will also save in {self.bar_log_path}")
-            info_dir,info_file = os.path.split(self.bar_log_path)
-            if info_dir and not os.path.exists(info_dir):os.makedirs(info_dir)
-            bar_log = logging.getLogger("progress_bar")
-            if (bar_log.hasHandlers()):bar_log.handlers.clear()# Important!!
-            bar_log.setLevel(logging.DEBUG)
-
-            handler = logging.FileHandler(self.bar_log_path)
-            handler.setLevel(logging.DEBUG)
-            handler.setFormatter(logging.Formatter('%(message)s'))
-            bar_log.addHandler(handler)
-
-            console = logging.StreamHandler();
-            console.setFormatter(logging.Formatter('%(message)s'))
-            bar_log.addHandler(console)
-
-            self.bar_log  = bar_log
+            self.info(f"the bar log will also save in {self.bar_log_path}",show=False)
+            self.bar_log = self.create_logger('progress_bar',console=True,offline_path=self.bar_log_path if offline_bar else None,logformat='%(message)s')
             self.tqdm_out = TqdmToLogger(self.bar_log,level=logging.DEBUG)
-
+        if self.runtime_log is None and (not isnotebook()):
+            self.info(f"the runtime loss in train/valid iter will save in {self.runtime_log_path}",show=False)
+            self.runtime_log = self.create_logger('runtime_log',console=False,offline_path=self.runtime_log_path)
         if banner_info is not None and self.global_do_log:
             if banner_info == 1:banner_info = self.banner.demo()
             self.info(banner_info)
-        if   isinstance(batches,int):batches=range(batches)
-        elif isinstance(batches,list):pass
-        else:raise NotImplementedError
         logging_redirect_tqdm([self.bar_log])
 
-        self.master_bar = master_bar(batches,file=self.tqdm_out,bar_format="{l_bar}{bar:30}{r_bar}{bar:-10b}", disable=self.diable_logbar)
+        if  isinstance(batches,int):batches=range(batches)
+        elif isinstance(batches,list):pass
+        else: raise NotImplementedError
+        self.master_bar = master_bar(batches,lwrite_log=self.runtime_log,file=self.tqdm_out,bar_format="{l_bar}{bar:30}{r_bar}{bar:-10b}", disable=self.diable_logbar)
         return self.master_bar
 
     def create_progress_bar(self,batches,force=False,**kargs):
         if self.progress_bar is not None and not force:
             _=self.progress_bar.restart(total=batches)
         else:
-            self.progress_bar = progress_bar(range(batches),file=self.tqdm_out,bar_format="{l_bar}{bar:30}{r_bar}{bar:-10b}",
-                                             disable=self.diable_logbar,parent=self.master_bar,**kargs)
+            self.progress_bar = progress_bar(range(batches),
+                lwrite_log=self.runtime_log,file=self.tqdm_out,
+                bar_format="{l_bar}{bar:30}{r_bar}{bar:-10b}",
+                disable=self.diable_logbar,parent=self.master_bar,**kargs)
         return self.progress_bar
 
     def create_model_saver(self,path=None,accu_list=None,earlystop_config={},
@@ -385,7 +377,8 @@ class LoggingSystem:
         else:
             magic_char = "\033[F"
             self.bar_log.info(magic_char * (len(table_string)+2))
-            for line in table_string:self.bar_log.info(line)
+            for line in table_string:
+                self.bar_log.info(line)
     def batch_loss_record(self,loss_list):
         if not self.global_do_log:return
         if self.Q_batch_loss_record:

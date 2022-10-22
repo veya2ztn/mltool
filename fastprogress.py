@@ -361,14 +361,16 @@ def multi_print_line(content, num=2,offset=0):
         raise TypeError("Excepting types: list, dict. Got: {}".format(type(content)))
 
 class tqdmBar(tqdm.tqdm):
-    def __init__(self,*args,parent=None,**kargs):
+    def __init__(self,*args,lwrite_log=None,parent=None,**kargs):
         super(tqdmBar,self).__init__(*args,**kargs)
         self.now=0
         self.parent = parent
-
+        self.lwrite_log = lwrite_log
     def lwrite(self,text,end=None):
         self.set_description(text)
-
+        if self.lwrite_log is not None:
+            if self.parent:text="  "+text
+            self.lwrite_log.info(text)
     @classmethod
     def write_table(self, table, num=2,offset=0,end="\n", nolock=False):
         """

@@ -407,6 +407,8 @@ class LoggingSystem:
         return self.metric_dict
 
     def banner_initial(self,epoches,FULLNAME,training_loss_trace=['loss'],show_best_accu_types=None,print_once=True):
+        if not self.global_do_log:
+            return
         self.info("initialize the log banner")
         self.show_best_accu_types = self.accu_list if show_best_accu_types is None else show_best_accu_types
         assert isinstance(self.show_best_accu_types,list)
@@ -438,6 +440,8 @@ class LoggingSystem:
         return outstring,shut_cut
 
     def banner_show(self,epoch,FULLNAME,train_losses=[-1]):
+        if not self.global_do_log:
+            return
         outstring,shut_cut = self.banner_str(epoch,FULLNAME,train_losses)
         self.runtime_log_table(outstring)
         self.info(shut_cut,show=False)

@@ -8,7 +8,12 @@ import os, random ,torch,shutil
 import numpy as np
 import torch.backends.cudnn as cudnn
 import logging,time
+
+os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_CONSOLE']='off'
 ISNotbookQ=isnotebook()
+
+import wandb
 class RNGSeed:
     def __init__(self, seed):
         self.seed = seed
@@ -145,8 +150,10 @@ class LoggingSystem:
     progress_bar =master_bar=train_bar=valid_bar   = None
     recorder = train_recorder = valid_recorder     = None
     global_step = console = bar_log =file_logger= tqdm_out =runtime_log =None
-
-    def __init__(self,global_do_log,ckpt_root,info_log_path=None,bar_log_path=None,gpu=0,project_name="project",seed=None,verbose=True):
+    wandb_logs={}
+    def __init__(self,global_do_log,ckpt_root,info_log_path=None,bar_log_path=None,gpu=0,
+                      project_name="project",seed=None, use_wandb=False,
+                      verbose=True):
         self.global_do_log   = global_do_log
         self.diable_logbar   = not global_do_log
         self.ckpt_root       = ckpt_root
@@ -161,7 +168,9 @@ class LoggingSystem:
         self.info_log_path = os.path.join(self.ckpt_root, 'log.info') if info_log_path is None else info_log_path
         self.bar_log_path  = os.path.join(self.ckpt_root, 'bar.logging.info') if bar_log_path is None else bar_log_path
         self.runtime_log_path= os.path.join(self.ckpt_root, 'runtime.log') if bar_log_path is None else bar_log_path
-
+        self.recorder_list=[]
+        if use_wandb and use_wandb =='wandb_runtime':self.recorder_list = 'wandb_runtime'
+        if use_wandb and use_wandb =='wandb_on_success':self.recorder_list = 'wandb_on_success'
 
     def set_rdn_seed(self,seed):
         self.rdn_seed = RNGSeed(seed)
@@ -210,14 +219,22 @@ class LoggingSystem:
         else:
             self.file_log.info(string)
 
-    def record(self,name,value,epoch):
+    def record(self,name,value,epoch,epoch_flag = 'epoch'):
         if not self.global_do_log:return
         if self.Q_recorder_type == 'tensorboard':
             self.recorder.add_scalar(name,value,epoch)
         else:
             self.recorder.step([value])
             self.recorder.auto_save_loss()
-
+        if ('wandb_runtime' in self.recorder_list):
+            self.wandblog({name:value,epoch_flag:epoch})
+        if ('wandb_on_success' in self.recorder_list):
+            if not hasattr(self,'wandb_logs'):self.wandb_logs={}
+            if epoch_flag not in self.wandb_logs:self.wandb_logs[epoch_flag]={}
+            if epoch not in self.wandb_logs[epoch_flag]:self.wandb_logs[epoch_flag][epoch]={}
+            if name not in self.wandb_logs[epoch_flag][epoch]:self.wandb_logs[epoch_flag][epoch][name]=[]
+            self.wandb_logs[epoch_flag][epoch][name].append(value) # if same epoch call multiple times, we collect and do mean
+            
     def add_figure(self,name,figure,epoch):
         if not self.global_do_log:return
         if self.Q_recorder_type == 'tensorboard':
@@ -261,6 +278,18 @@ class LoggingSystem:
 
     def create_recorder(self,**kargs):
         if not self.global_do_log:return
+        if ('wandb_runtime' in self.recorder_list) or ('wandb_on_success' in self.recorder_list):
+            wandb.init(config  = kargs.get('args'),
+                project = kargs.get('project'),
+                entity  = "szztn951357",
+                group   = kargs.get('group'),
+                job_type= kargs.get('job_type'),
+                name    = kargs.get('name'),
+                settings= wandb.Settings(_disable_stats=True),
+                id = kargs.get('wandb_id'),
+                resume=kargs.get('wandb_resume')
+                )
+        
         if self.Q_recorder_type == 'tensorboard':
             self.train_recorder = self.valid_recorder = self.create_web_inference(self.ckpt_root,**kargs)
             return self.train_recorder
@@ -269,7 +298,7 @@ class LoggingSystem:
             self.valid_recorder = RecordLoss(loss_records=[IdentyMeter(),IdentyMeter()], mode='test',save_txt_step=1,log_file = self.ckpt_root)
             return self.train_recorder
 
-    def create_web_inference(self,log_dir,hparam_dict=None,metric_dict=None):
+    def create_web_inference(self,log_dir,hparam_dict=None,metric_dict=None,**kargs):
         if not self.global_do_log:return
         if hparam_dict is None:return
         self.regist({'hyparam':hparam_dict})
@@ -394,12 +423,29 @@ class LoggingSystem:
         if self.Q_recorder_type == 'tensorboard':
             self.recorder.export_scalars_to_json(os.path.join(self.ckpt_root,"all_scalars.json"))
 
+    def wandblog(self,pool):
+        if ('wandb_runtime' in self.recorder_list) or ('wandb_on_success' in self.recorder_list):
+            wandb.log(pool)
+
     def close(self):
         if not self.global_do_log:return
         if self.recorder is not None:  self.recorder.close()
         if self.master_bar is not None:self.master_bar.close()
         if self.train_bar is not None: self.train_bar.close()
         if self.valid_bar is not None: self.valid_bar.close()
+        if ('wandb_on_success' in self.recorder_list):
+            epoch_flags = list(self.wandb_logs.keys())
+            self.info(f'''we will now do wandb record processing and do record, may very cost time.
+            we have collect {len(epoch_flags)} level data:{epoch_flags} with {[len(self.wandb_logs[k]) for k in epoch_flags]} records
+            ''')
+            for epoch_flag, pools in self.wandb_logs.items():
+                for epoch, named_value_pool in pools.items():
+                    logpool = {epoch_flag:epoch}
+                    for name,value_list in named_value_pool.items():
+                        logpool[name] = np.mean(value_list)
+                self.wandblog(logpool)
+        if ('wandb_runtime' in self.recorder_list) or ('wandb_on_success' in self.recorder_list):
+            wandb.finish()    
 
     def initial_metric_dict(self,accu_list):
         self.accu_list   =  accu_list

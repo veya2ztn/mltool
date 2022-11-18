@@ -9,8 +9,6 @@ import numpy as np
 import torch.backends.cudnn as cudnn
 import logging,time
 
-os.environ['WANDB_MODE'] = 'offline'
-os.environ['WANDB_CONSOLE']='off'
 ISNotbookQ=isnotebook()
 
 import wandb
@@ -279,12 +277,17 @@ class LoggingSystem:
     def create_recorder(self,**kargs):
         if not self.global_do_log:return
         if ('wandb_runtime' in self.recorder_list) or ('wandb_on_success' in self.recorder_list):
+            project = kargs.get('project')
+            group   = kargs.get('group')
+            job_type= kargs.get('job_type')
+            name    = kargs.get('name')
+
             wandb.init(config  = kargs.get('args'),
-                project = kargs.get('project'),
+                project = project,
                 entity  = "szztn951357",
-                group   = kargs.get('group'),
-                job_type= kargs.get('job_type'),
-                name    = kargs.get('name'),
+                group   = group,
+                job_type= job_type,
+                name    = name,
                 settings= wandb.Settings(_disable_stats=True),
                 id = kargs.get('wandb_id'),
                 resume=kargs.get('wandb_resume')

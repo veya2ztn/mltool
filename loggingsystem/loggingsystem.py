@@ -209,6 +209,9 @@ class LoggingSystem:
             logger.addHandler(console)
         return logger
 
+    def wandb_watch(self,*args,**kargs):
+        if ('wandb_runtime' in self.recorder_list) or ('wandb_on_success' in self.recorder_list):
+            wandb.watch(*args,**kargs)
 
     def info(self,string,show=True):
         if not self.global_do_log:return

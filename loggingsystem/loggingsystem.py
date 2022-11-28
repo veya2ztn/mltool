@@ -224,7 +224,7 @@ class LoggingSystem:
 
     def record(self,name,value,epoch,epoch_flag = 'epoch'):
         if not self.global_do_log:return
-        if 'tensorbard' in self.recorder_list:
+        if 'tensorboard' in self.recorder_list:
             self.recorder.add_scalar(name,value,epoch)
         if 'naive' in self.recorder_list:
             self.recorder.step([value])
@@ -240,7 +240,7 @@ class LoggingSystem:
             
     def add_figure(self,name,figure,epoch):
         if not self.global_do_log:return
-        if 'tensorbard' in self.recorder_list:
+        if 'tensorboard' in self.recorder_list:
             self.recorder.add_figure(name,figure,epoch)
     
     def add_table(self,name,table,epoch,columns):
@@ -305,7 +305,7 @@ class LoggingSystem:
                 )
         else:
             print(f"wandb is off, the recorder list is  {self.recorder_list}, we pass wandb")
-        if 'tensorbard' in self.recorder_list and self.train_recorder is None:
+        if 'tensorboard' in self.recorder_list and self.train_recorder is None:
             self.train_recorder = self.valid_recorder = self.create_web_inference(self.ckpt_root,**kargs)
         if 'naive' in self.recorder_list and self.train_recorder is None:
             self.train_recorder = RecordLoss(loss_records=[AverageMeter()],mode = 'train',save_txt_step=1,log_file = self.ckpt_root)
@@ -435,7 +435,7 @@ class LoggingSystem:
 
     def save_scalars(self):
         if not self.global_do_log:return
-        if 'tensorbard' in self.recorder_list:
+        if 'tensorboard' in self.recorder_list:
             self.recorder.export_scalars_to_json(os.path.join(self.ckpt_root,"all_scalars.json"))
 
     def wandblog(self,pool,step=None):

@@ -150,7 +150,7 @@ class LoggingSystem:
     global_step = console = bar_log =file_logger= tqdm_out =runtime_log =None
     wandb_logs={}
     def __init__(self,global_do_log,ckpt_root,info_log_path=None,bar_log_path=None,gpu=0,
-                      project_name="project",seed=None, use_wandb=False,
+                      project_name="project",seed=None, use_wandb=False, flag="",
                       verbose=True,recorder_list = ['tensorboard'],Q_batch_loss_record=False):
         self.global_do_log   = global_do_log
         self.diable_logbar   = not global_do_log
@@ -163,9 +163,9 @@ class LoggingSystem:
         if isinstance(seed,int):self.set_rdn_seed(seed)
         self.seed = seed
         if verbose:print(f"log at {ckpt_root}")
-        self.info_log_path = os.path.join(self.ckpt_root, 'log.info') if info_log_path is None else info_log_path
-        self.bar_log_path  = os.path.join(self.ckpt_root, 'bar.logging.info') if bar_log_path is None else bar_log_path
-        self.runtime_log_path= os.path.join(self.ckpt_root, 'runtime.log') if bar_log_path is None else bar_log_path
+        self.info_log_path = os.path.join(self.ckpt_root, f'{flag}log.info') if info_log_path is None else info_log_path
+        self.bar_log_path  = os.path.join(self.ckpt_root, f'{flag}bar.logging.info') if bar_log_path is None else bar_log_path
+        self.runtime_log_path= os.path.join(self.ckpt_root, f'{flag}runtime.log') if bar_log_path is None else bar_log_path
         self.recorder_list=recorder_list
         if use_wandb and use_wandb =='wandb_runtime':
             self.recorder_list.append('wandb_runtime')

@@ -8,7 +8,7 @@ import os, random ,torch,shutil
 import numpy as np
 import torch.backends.cudnn as cudnn
 import logging,time
-
+os.environ['WANDB_CONSOLE']='off'
 ISNotbookQ=isnotebook()
 
 import wandb

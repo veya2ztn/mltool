@@ -151,9 +151,10 @@ class LoggingSystem:
     wandb_logs={}
     def __init__(self,global_do_log,ckpt_root,info_log_path=None,bar_log_path=None,gpu=0,
                       project_name="project",seed=None, use_wandb=False, flag="",
-                      verbose=True,recorder_list = ['tensorboard'],Q_batch_loss_record=False):
+                      verbose=True,recorder_list = ['tensorboard'],Q_batch_loss_record=False,disable_progress_bar=False):
         self.global_do_log   = global_do_log
         self.diable_logbar   = not global_do_log
+        self.disable_progress_bar= not global_do_log or disable_progress_bar
         self.ckpt_root       = ckpt_root
         #self.Q_recorder_type = 'tensorboard'
         self.Q_batch_loss_record = Q_batch_loss_record
@@ -267,14 +268,14 @@ class LoggingSystem:
         self.master_bar = master_bar(batches,lwrite_log=self.runtime_log,file=self.tqdm_out,bar_format="{l_bar}{bar:30}{r_bar}{bar:-10b}", disable=self.diable_logbar)
         return self.master_bar
 
-    def create_progress_bar(self,batches,force=False,**kargs):
+    def create_progress_bar(self,batches,force=False,disable=False,**kargs):
         if self.progress_bar is not None and not force:
             _=self.progress_bar.restart(total=batches)
         else:
             self.progress_bar = progress_bar(range(batches),
                 lwrite_log=self.runtime_log,file=self.tqdm_out,
                 bar_format="{l_bar}{bar:30}{r_bar}{bar:-10b}",
-                disable=self.diable_logbar,parent=self.master_bar,**kargs)
+                disable=self.disable_progress_bar,parent=self.master_bar,**kargs)
         return self.progress_bar
 
     def create_model_saver(self,path=None,accu_list=None,earlystop_config={},

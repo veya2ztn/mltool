@@ -223,7 +223,7 @@ class LoggingSystem:
         else:
             self.file_log.info(string)
 
-    def record(self,name,value,epoch,epoch_flag = 'epoch'):
+    def record(self,name,value,epoch=None,epoch_flag = 'epoch', extra_epoch_dict = None):
         if not self.global_do_log:return
         if 'tensorboard' in self.recorder_list:
             self.recorder.add_scalar(name,value,epoch)
@@ -231,14 +231,19 @@ class LoggingSystem:
             self.recorder.step([value])
             self.recorder.auto_save_loss()
         if ('wandb_runtime' in self.recorder_list):
-            self.wandblog({name:value,epoch_flag:epoch})
+            record_dict = {name:value,epoch_flag:epoch}
+            if extra_epoch_dict is not None:
+                for key,val in extra_epoch_dict.items():
+                     record_dict[key] = val
+            self.wandblog(record_dict)
         if ('wandb_on_success' in self.recorder_list):
             if not hasattr(self,'wandb_logs'):self.wandb_logs={}
             if epoch_flag not in self.wandb_logs:self.wandb_logs[epoch_flag]={}
             if epoch not in self.wandb_logs[epoch_flag]:self.wandb_logs[epoch_flag][epoch]={}
             if name not in self.wandb_logs[epoch_flag][epoch]:self.wandb_logs[epoch_flag][epoch][name]=[]
             self.wandb_logs[epoch_flag][epoch][name].append(value) # if same epoch call multiple times, we collect and do mean
-            
+
+
     def add_figure(self,name,figure,epoch):
         if not self.global_do_log:return
         if 'tensorboard' in self.recorder_list:

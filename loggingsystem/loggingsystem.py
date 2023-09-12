@@ -149,6 +149,7 @@ class LoggingSystem:
     recorder = train_recorder = valid_recorder     = None
     global_step = console = bar_log =file_logger= tqdm_out =runtime_log =None
     wandb_logs={}
+    wandb_prefix=''
     def __init__(self,global_do_log,ckpt_root,info_log_path=None,bar_log_path=None,gpu=0,
                       project_name="project",seed=None, use_wandb=False, flag="",
                       verbose=True,recorder_list = ['tensorboard'],Q_batch_loss_record=False,disable_progress_bar=False):
@@ -173,6 +174,15 @@ class LoggingSystem:
         if use_wandb and use_wandb =='wandb_on_success':
             self.recorder_list.append('wandb_on_success')
 
+    def reinitialize_on_path(self, new_path):
+        if self.recorder is not None:  self.recorder.close()
+        if self.master_bar is not None:self.master_bar.close()
+        if self.train_bar is not None: self.train_bar.close()
+        if self.valid_bar is not None: self.valid_bar.close()
+        self.ckpt_root = new_path
+        self.create_recorder(['tensorboard'])
+        self.file_log = self.create_logger("information_file_log",console=True,offline_path=os.path.join(self.ckpt_root, f'log.info'),console_level=logging.WARNING)
+    
     def set_rdn_seed(self,seed):
         self.rdn_seed = RNGSeed(seed)
 
@@ -242,7 +252,7 @@ class LoggingSystem:
             if epoch not in self.wandb_logs[epoch_flag]:self.wandb_logs[epoch_flag][epoch]={}
             if name not in self.wandb_logs[epoch_flag][epoch]:self.wandb_logs[epoch_flag][epoch][name]=[]
             self.wandb_logs[epoch_flag][epoch][name].append(value) # if same epoch call multiple times, we collect and do mean
-
+    
 
     def add_figure(self,name,figure,epoch):
         if not self.global_do_log:return
@@ -290,9 +300,10 @@ class LoggingSystem:
         self.model_saver = ModelSaver(self.saver_path,accu_list,earlystop_config=earlystop_config  ,**kargs)
         self.anomal_detecter =anomal_detect(**anormal_d_config)
 
-    def create_recorder(self,**kargs):
+    def create_recorder(self,recorder_list=None, **kargs):
         if not self.global_do_log:return
-        if ('wandb_runtime' in self.recorder_list) or ('wandb_on_success' in self.recorder_list):
+        if recorder_list is None: recorder_list = self.recorder_list
+        if ('wandb_runtime' in recorder_list) or ('wandb_on_success' in recorder_list):
             print("we will use wandb")
             project = kargs.get('project')
             group   = kargs.get('group')
@@ -301,7 +312,7 @@ class LoggingSystem:
 
             wandb.init(config  = kargs.get('args'),
                 project = project,
-                entity  = "szztn951357",
+                #entity  = "szztn951357",
                 group   = group,
                 job_type= job_type,
                 name    = name,
@@ -310,10 +321,10 @@ class LoggingSystem:
                 resume=kargs.get('wandb_resume')
                 )
         else:
-            print(f"wandb is off, the recorder list is  {self.recorder_list}, we pass wandb")
-        if 'tensorboard' in self.recorder_list and self.train_recorder is None:
+            print(f"wandb is off, the recorder list is  {recorder_list}, we pass wandb")
+        if 'tensorboard' in recorder_list and self.train_recorder is None:
             self.train_recorder = self.valid_recorder = self.create_web_inference(self.ckpt_root,**kargs)
-        if 'naive' in self.recorder_list and self.train_recorder is None:
+        if 'naive' in recorder_list and self.train_recorder is None:
             self.train_recorder = RecordLoss(loss_records=[AverageMeter()],mode = 'train',save_txt_step=1,log_file = self.ckpt_root)
             self.valid_recorder = RecordLoss(loss_records=[IdentyMeter(),IdentyMeter()], mode='test',save_txt_step=1,log_file = self.ckpt_root)
         return self.train_recorder
@@ -446,6 +457,8 @@ class LoggingSystem:
 
     def wandblog(self,pool,step=None):
         if ('wandb_runtime' in self.recorder_list) or ('wandb_on_success' in self.recorder_list):
+            if self.wandb_prefix != "":
+                pool = dict([(f"{self.wandb_prefix}_{k}",v) for k,v in pool.items()])
             wandb.log(pool,step=step)
 
     def close(self):

@@ -122,7 +122,7 @@ def print_conv_k_b(model,gpu):
             rv = child.bias.mean() if child.bias is not None else None
             print("{} {} {} {}".format(gpu,name,rm,rv))
         print_conv_k_b(child,gpu)
-
+import torch.nn as nn
 def init_weights(m):
     if isinstance(m, nn.Conv2d):
         torch.nn.init.xavier_uniform_(m.weight)

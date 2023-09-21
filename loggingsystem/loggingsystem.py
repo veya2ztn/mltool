@@ -150,10 +150,12 @@ class LoggingSystem:
     global_step = console = bar_log =file_logger= tqdm_out =runtime_log =None
     wandb_logs={}
     wandb_prefix=''
+    bar_log_path=runtime_log_path=info_log_path=None
     def __init__(self,global_do_log,ckpt_root,info_log_path=None,bar_log_path=None,gpu=0,
                       project_name="project",seed=None, use_wandb=False, flag="",
                       verbose=True,recorder_list = ['tensorboard'],Q_batch_loss_record=False,disable_progress_bar=False):
         self.global_do_log   = global_do_log
+        
         self.diable_logbar   = not global_do_log
         self.disable_progress_bar= not global_do_log or disable_progress_bar
         self.ckpt_root       = ckpt_root
@@ -164,15 +166,16 @@ class LoggingSystem:
         if seed == 'random':seed = random.randint(1, 100000)
         if isinstance(seed,int):self.set_rdn_seed(seed)
         self.seed = seed
-        if verbose:print(f"log at {ckpt_root}")
-        self.info_log_path = os.path.join(self.ckpt_root, f'{flag}log.info') if info_log_path is None else info_log_path
-        self.bar_log_path  = os.path.join(self.ckpt_root, f'{flag}bar.logging.info') if bar_log_path is None else bar_log_path
-        self.runtime_log_path= os.path.join(self.ckpt_root, f'{flag}runtime.log') if bar_log_path is None else bar_log_path
-        self.recorder_list=recorder_list
-        if use_wandb and use_wandb =='wandb_runtime':
-            self.recorder_list.append('wandb_runtime')
-        if use_wandb and use_wandb =='wandb_on_success':
-            self.recorder_list.append('wandb_on_success')
+        if global_do_log:
+            if verbose:print(f"log at {ckpt_root}")
+            self.info_log_path = os.path.join(self.ckpt_root, f'{flag}log.info') if info_log_path is None else info_log_path
+            self.bar_log_path  = os.path.join(self.ckpt_root, f'{flag}bar.logging.info') if bar_log_path is None else bar_log_path
+            self.runtime_log_path= os.path.join(self.ckpt_root, f'{flag}runtime.log') if bar_log_path is None else bar_log_path
+            self.recorder_list=recorder_list
+            if use_wandb and use_wandb =='wandb_runtime':
+                self.recorder_list.append('wandb_runtime')
+            if use_wandb and use_wandb =='wandb_on_success':
+                self.recorder_list.append('wandb_on_success')
 
     def reinitialize_on_path(self, new_path):
         if self.recorder is not None:  self.recorder.close()
@@ -265,11 +268,11 @@ class LoggingSystem:
             self.wandblog({name: wandb.Table(data=table,columns = columns),'epoch':epoch})
 
     def create_master_bar(self,batches,banner_info=None,offline_bar=False):
-        if self.bar_log is None and (not isnotebook()):
+        if self.bar_log is None and (not isnotebook()) and self.bar_log_path:
             self.info(f"the bar log will also save in {self.bar_log_path}",show=False)
             self.bar_log = self.create_logger('progress_bar',console=True,offline_path=self.bar_log_path if offline_bar else None,logformat='%(message)s')
             self.tqdm_out = TqdmToLogger(self.bar_log,level=logging.DEBUG)
-        if self.runtime_log is None and (not isnotebook()):
+        if self.runtime_log is None and (not isnotebook()) and self.runtime_log_path:
             self.info(f"the runtime loss in train/valid iter will save in {self.runtime_log_path}",show=False)
             self.runtime_log = self.create_logger('runtime_log',console=False,offline_path=self.runtime_log_path)
         if banner_info is not None and self.global_do_log:

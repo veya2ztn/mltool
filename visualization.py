@@ -50,7 +50,7 @@ def draw_line(image,shape,color='white',mode='xywh'):
                 _=cv2.rectangle(img,(x1, y1),(x2, y2),color,2)
         return img
 
-def smoothhist(data,**kargs):
+def smoothhist(data,ax=None,**kargs):
     density = gaussian_kde(data)
     xs = np.linspace(min(data),max(data),200)
     density.covariance_factor = lambda : .25
@@ -58,7 +58,10 @@ def smoothhist(data,**kargs):
     x = xs
     y = density(xs)
     y = y/y.max()
-    plt.plot(x,y,**kargs)
+    if ax is not None:
+        ax.plot(x,y,**kargs)
+    else:
+        plt.plot(x,y,**kargs)
 
 def smoothheatdensity(x,y):
     data = np.vstack([x, y])

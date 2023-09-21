@@ -122,7 +122,7 @@ def print_conv_k_b(model,gpu):
             rv = child.bias.mean() if child.bias is not None else None
             print("{} {} {} {}".format(gpu,name,rm,rv))
         print_conv_k_b(child,gpu)
-
+import torch.nn as nn
 def init_weights(m):
     if isinstance(m, nn.Conv2d):
         torch.nn.init.xavier_uniform_(m.weight)
@@ -131,10 +131,11 @@ def init_weights(m):
     if isinstance(m, nn.Linear):
         #torch.nn.init.constant_(m.weight,0.5)
         torch.nn.init.xavier_uniform_(m.weight)
-        m.bias.data.fill_(0.01)
+        if m.bias is not None:m.bias.data.fill_(0.01)
     if isinstance(m, nn.BatchNorm2d):
         torch.nn.init.constant_(m.weight,0.5)
-        m.bias.data.fill_(0)
+        if m.bias is not None:
+            m.bias.data.fill_(0)
     if type(m) in [nn.GRU, nn.LSTM, nn.RNN]:
         for name, param in m.named_parameters():
             if 'weight_ih' in name:

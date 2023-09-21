@@ -2,15 +2,16 @@
 
 # 新建DataLoaderX类
 from torch.utils.data import DataLoader
-
+import numpy as np
 import torch
 
 def sendall2gpu(listinlist,device):
-    out=[]
-    if isinstance(listinlist,list):
-        for _list in listinlist:
-            out.append(sendall2gpu(_list,device))
-        return out
+    if isinstance(listinlist,(list,tuple)):
+        return [sendall2gpu(_list,device) for _list in listinlist]
+    elif isinstance(listinlist, (dict)):
+        return dict([(key,sendall2gpu(val,device)) for key,val in listinlist.items()])
+    elif isinstance(listinlist, np.ndarray):
+        return torch.from_numpy(listinlist).to(device=device, non_blocking=True)
     else:
         return listinlist.to(device=device, non_blocking=True)
 try:
@@ -19,7 +20,7 @@ try:
         def __iter__(self):
             return BackgroundGenerator(super().__iter__())
 except:
-    DataLoaderX = DataLoader
+    pass#DataLoaderX = DataLoader
 class DataSimfetcher():
     def __init__(self, loader, device='auto'):
     
@@ -85,3 +86,4 @@ class infinite_batcher:
             self.now=0
         self.now+=1
         return self.prefetcher.next()
+

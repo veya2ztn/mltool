@@ -1,0 +1,3 @@
+[submodule "torchnnprofiler"]
+	path = torchnnprofiler
+	url = https://github.com/veya2ztn/torchnnprofiler.git
